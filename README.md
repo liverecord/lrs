@@ -1,0 +1,2 @@
+# lrserver
+LiveRecord server app
