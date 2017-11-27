@@ -61,7 +61,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 		}
 
 		for {
-			var msg Message
+			// var msg Message
 			var frame Frame
 			// Read in a new message as JSON and map it to a Message object
 			//messageType, p, err := ws.ReadMessage()
@@ -87,11 +87,15 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 
 				case JWTFrame:
 					JWTAuthHandler(Cfg, ws, Db, frame)
+
+				case UserInfoFrame:
+					UserInfoHandler(Cfg, ws, Db, frame)
+
 				}
 
 			}
 			// Send the newly received message to the broadcast channel
-			broadcast <- msg
+			// broadcast <- msg
 		}
 	}
 }
@@ -138,8 +142,13 @@ func main() {
 		defer Db.Close()
 		Db.LogMode(BoolEnv("DEBUG", "false"))
 
-		Db.AutoMigrate(&User{})
 		Db.AutoMigrate(&ServerConfig{})
+		Db.AutoMigrate(&User{})
+		Db.AutoMigrate(&Topic{})
+		Db.AutoMigrate(&Comment{})
+		Db.AutoMigrate(&Category{})
+		Db.AutoMigrate(&SocialProfile{})
+		Db.AutoMigrate(&Role{})
 
 		var cfgr ServerConfig
 		Db.First(&cfgr)

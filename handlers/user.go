@@ -44,6 +44,7 @@ func LoginHandler(cfg *ServerConfig, ws *websocket.Conn, Db *gorm.DB, frame Fram
 	} else {
 		user.Email = authData.Email
 		user.Name = user.MakeNameFromEmail()
+		user.Roles = []Role{}
 		user.MakeSlug()
 		user.SetPassword(authData.Password)
 		user.Picture = user.MakeGravatarPicture()
@@ -107,6 +108,25 @@ func AuthorizeJWT(tokenString string, cfg *ServerConfig, ws *websocket.Conn, Db 
 		logrus.Error(err)
 	}
 
+}
+
+type UserInfoRequest struct {
+	Slug string `json:"slug"`
+}
+
+func UserInfoHandler(cfg *ServerConfig, ws *websocket.Conn, Db *gorm.DB, frame Frame) {
+	var request UserInfoRequest
+	var user User
+	json.Unmarshal([]byte(frame.Data), &request)
+	Db.Where("id = ? OR slug = ?", request.Slug, request.Slug).First(&user)
+	if user.ID > 0 {
+		userData, err := json.Marshal(user)
+		if err == nil {
+			ws.WriteJSON(Frame{Type: UserInfoFrame, Data: string(userData)})
+		} else {
+			logrus.WithError(err)
+		}
+	}
 }
 
 func UserUpdateHandler(cfg *ServerConfig, ws *websocket.Conn, Db *gorm.DB, frame Frame) {

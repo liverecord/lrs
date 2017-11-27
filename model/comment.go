@@ -3,6 +3,7 @@ package model
 type Comment struct {
 	Model
 	Topic       Topic
+	User        User
 	Body        string `json:"body"`
 	Attachments []Attachment
 }

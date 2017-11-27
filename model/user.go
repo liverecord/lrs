@@ -14,18 +14,18 @@ import (
 
 type User struct {
 	Model
-	Email    string  `validator:"email" json:"email"`
-	Password string  `json:"-"`
-	Hash     string  `json:"-"`
-	Name     string  `json:"name"`
-	Slug     string  `json:"slug"`
-	Picture  string  `json:"picture"`
-	About    string  `json:"about"`
-	Gender   string  `json:"gender"`
-	Rank     float32 `json:"rank"`
-	Online   bool    `json:"online"`
-	Roles    []Role  `json:"roles"`
-	Profiles []SocialProfile
+	Email    string          `validator:"email" json:"email"`
+	Password string          `json:"-"`
+	Hash     string          `json:"-"`
+	Name     string          `json:"name"`
+	Slug     string          `json:"slug"`
+	Picture  string          `json:"picture"`
+	About    string          `json:"about"`
+	Gender   string          `json:"gender"`
+	Rank     float32         `json:"rank"`
+	Online   bool            `json:"online"`
+	Roles    []Role          `json:"roles"`
+	Profiles []SocialProfile `json:"profiles"`
 }
 
 type SocialProfile struct {
