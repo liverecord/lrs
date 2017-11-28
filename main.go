@@ -56,8 +56,16 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 		w := map[string]interface{}{"type": 0, "connected": true}
 		ws.WriteJSON(w)
 
+		// our registry
+		var lr = LiveRecord{
+			Db:     Db,
+			Cfg:    Cfg,
+			Logger: logger,
+			Ws:     ws,
+		}
+
 		if len(jwt) > 0 {
-			AuthorizeJWT(jwt, Cfg, ws, Db)
+			lr.AuthorizeJWT(jwt)
 		}
 
 		for {
@@ -83,14 +91,16 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 					})
 
 				case AuthFrame:
-					LoginHandler(Cfg, ws, Db, frame)
+					lr.Login(frame)
 
 				case JWTFrame:
-					JWTAuthHandler(Cfg, ws, Db, frame)
+					lr.AuthorizeJWT(frame.Data)
 
 				case UserInfoFrame:
-					UserInfoHandler(Cfg, ws, Db, frame)
+					lr.UserInfo(frame)
 
+				case UserUpdateFrame:
+					lr.UserUpdate(frame)
 				}
 
 			}

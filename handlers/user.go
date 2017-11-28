@@ -1,15 +1,12 @@
-package user
+package handlers
 
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/dgrijalva/jwt-go"
-	"github.com/gorilla/websocket"
-	"github.com/jinzhu/gorm"
 
 	. "github.com/liverecord/server/common/common"
 	. "github.com/liverecord/server/common/frame"
@@ -22,23 +19,28 @@ type UserLoginData struct {
 	User User   `json:"user"`
 }
 
-func LoginHandler(cfg *ServerConfig, ws *websocket.Conn, Db *gorm.DB, frame Frame) {
+type UserInfoRequest struct {
+	Slug string `json:"slug"`
+}
+
+func (Lr *LiveRecord) Login(frame Frame) {
 	var authData UserAuthData
 
 	json.Unmarshal([]byte(frame.Data), &authData)
-	log.Printf("AuthData: %v", authData)
+	Lr.Logger.Debugf("AuthData: %v", authData)
 	var user User
-	Db.Where("email = ?", authData.Email).First(&user)
+	Lr.Db.Where("email = ?", authData.Email).First(&user)
 	if user.ID != 0 {
 		err := bcrypt.CompareHashAndPassword(
 			S2BA(user.Password),
 			S2BA(authData.Password))
 		if err == nil {
 			// we are cool, password is correct
-			respondWithToken(user, cfg, ws)
+			Lr.respondWithToken(user)
+			Lr.User = &user
 		} else {
-			ws.WriteJSON(Frame{Type: AuthErrorFrame, Data: "PasswordMismatch"})
-			log.Printf("Cannot authorize user %s %v", user.Email, err)
+			Lr.Ws.WriteJSON(Frame{Type: AuthErrorFrame, Data: "PasswordMismatch"})
+			Lr.Logger.WithError(err).Errorf("Cannot authorize user %s %v", user.Email, err)
 		}
 
 	} else {
@@ -48,26 +50,27 @@ func LoginHandler(cfg *ServerConfig, ws *websocket.Conn, Db *gorm.DB, frame Fram
 		user.MakeSlug()
 		user.SetPassword(authData.Password)
 		user.Picture = user.MakeGravatarPicture()
-		Db.Save(&user)
-		respondWithToken(user, cfg, ws)
+		Lr.Db.Save(&user)
+		Lr.User = &user
+		Lr.respondWithToken(user)
 	}
 }
 
-func respondWithToken(user User, cfg *ServerConfig, ws *websocket.Conn) {
-	uld, err := generateToken(user, cfg)
+func (Lr *LiveRecord) respondWithToken(user User) {
+	uld, err := Lr.generateToken(user)
 	if err == nil {
 		userData, err := json.Marshal(uld)
 		if err == nil {
-			ws.WriteJSON(Frame{Type: AuthFrame, Data: string(userData)})
+			Lr.Ws.WriteJSON(Frame{Type: AuthFrame, Data: string(userData)})
 		} else {
-			log.Printf("Cannot marshall user data %v", err)
+			Lr.Logger.WithError(err).Error("Cannot marshall user data")
 		}
 	} else {
-		log.Printf("Cannot generate token %v", err)
+		Lr.Logger.WithError(err).Printf("Cannot generate token %v", err)
 	}
 }
 
-func generateToken(user User, cfg *ServerConfig) (UserLoginData, error) {
+func (Lr *LiveRecord) generateToken(user User) (UserLoginData, error) {
 	// Create the token
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256,
 		jwt.MapClaims{
@@ -79,58 +82,69 @@ func generateToken(user User, cfg *ServerConfig) (UserLoginData, error) {
 	var uld UserLoginData
 	var err error
 	uld.User = user
-	uld.Jwt, err = token.SignedString(cfg.JwtSignature)
+	uld.Jwt, err = token.SignedString(Lr.Cfg.JwtSignature)
 	return uld, err
 }
 
-func AuthorizeJWT(tokenString string, cfg *ServerConfig, ws *websocket.Conn, Db *gorm.DB) {
+func (Lr *LiveRecord) AuthorizeJWT(tokenString string) {
 
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		// Don't forget to validate the alg is what you expect:
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-
-		// hmacSampleSecret is a []byte containing your secret, e.g. []byte("my_secret_key")
-		return cfg.JwtSignature, nil
+		return Lr.Cfg.JwtSignature, nil
 	})
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 		fmt.Println(claims["uid"], claims["exp"])
-		logrus.WithFields(logrus.Fields(claims)).Debug("Debugged tokens")
+		Lr.Logger.WithFields(logrus.Fields(claims)).Debug("Debugged tokens")
 		var user User
-		Db.Where("id = ? AND hash = ?", claims["uid"], claims["hash"]).First(&user)
+		Lr.Db.Where("id = ? AND hash = ?", claims["uid"], claims["hash"]).First(&user)
 		if user.ID != 0 {
-			respondWithToken(user, cfg, ws)
+			Lr.respondWithToken(user)
 		}
 
 	} else {
-		logrus.Error(err)
+		Lr.Logger.Error(err)
 	}
 
 }
 
-type UserInfoRequest struct {
-	Slug string `json:"slug"`
-}
-
-func UserInfoHandler(cfg *ServerConfig, ws *websocket.Conn, Db *gorm.DB, frame Frame) {
+func  (Lr *LiveRecord) UserInfo(frame Frame) {
 	var request UserInfoRequest
 	var user User
 	json.Unmarshal([]byte(frame.Data), &request)
-	Db.Where("id = ? OR slug = ?", request.Slug, request.Slug).First(&user)
+	Lr.Db.Where("id = ? OR slug = ?", request.Slug, request.Slug).First(&user)
 	if user.ID > 0 {
 		userData, err := json.Marshal(user)
 		if err == nil {
-			ws.WriteJSON(Frame{Type: UserInfoFrame, Data: string(userData)})
+			Lr.Ws.WriteJSON(Frame{Type: UserInfoFrame, Data: string(userData)})
 		} else {
 			logrus.WithError(err)
 		}
 	}
 }
 
-func UserUpdateHandler(cfg *ServerConfig, ws *websocket.Conn, Db *gorm.DB, frame Frame) {
+func (Lr *LiveRecord) UserUpdate(frame Frame) {
+	if Lr.User == nil {
+
+	} else {
+		var user User
+		json.Unmarshal([]byte(frame.Data), &user)
+		if Lr.User.ID == user.ID {
+			Lr.Db.First(Lr.User)
+			Lr.User.Email = user.Email
+			Lr.User.Name = user.Name
+			Lr.User.Gender = user.Gender
+			Lr.Db.Save(Lr.User)
+			Lr.respondWithToken(*Lr.User)
+		}
+	}
 }
 
-func JWTAuthHandler(cfg *ServerConfig, ws *websocket.Conn, Db *gorm.DB, frame Frame) {
+func (Lr *LiveRecord) UserDelete(frame Frame) {
+	var user User
+	json.Unmarshal([]byte(frame.Data), &user)
+	Lr.Db.Delete(&user)
 }
