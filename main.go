@@ -57,7 +57,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 		ws.WriteJSON(w)
 
 		// our registry
-		var lr = LiveRecord{
+		var lr = AppContext{
 			Db:     Db,
 			Cfg:    Cfg,
 			Logger: logger,
@@ -101,6 +101,9 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 
 				case UserUpdateFrame:
 					lr.UserUpdate(frame)
+
+				case CategoryListFrame:
+					lr.CategoryList(frame)
 				}
 
 			}
@@ -108,6 +111,9 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 			// broadcast <- msg
 		}
 	}
+}
+func handleOauth(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("Location", "/")
 }
 
 func handleBroadcastMessages() {
@@ -145,6 +151,8 @@ func main() {
 	fs := http.FileServer(http.Dir(Env("DOCUMENT_ROOT", "public")))
 	http.Handle("/", fs)
 	http.HandleFunc("/ws", handleConnections)
+	http.HandleFunc("/api/oauth/", handleOauth)
+	http.HandleFunc("/api/oauth/facebook/", handleOauth)
 
 	go handleBroadcastMessages()
 

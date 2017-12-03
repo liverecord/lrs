@@ -10,7 +10,7 @@ import (
 	"github.com/liverecord/server/common/common"
 )
 
-type LiveRecord struct {
+type AppContext struct {
 	Cfg    *common.ServerConfig
 	Db     *gorm.DB
 	Logger *logrus.Logger

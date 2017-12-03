@@ -1,23 +1,32 @@
 package frame
 
+import "encoding/json"
+
 const (
-	PingFrame = iota
-	AuthFrame
-	AuthErrorFrame
-	JWTFrame
-	UserListFrame
-	UserInfoFrame
-	UserUpdateFrame
-	UserDeleteFrame
-	CategoryFrame
-	CategoryErrorFrame
-	TopicFrame
-	CommentFrame
-	UserFrame
+	PingFrame = "Ping"
+	AuthFrame = "Auth"
+	AuthErrorFrame = "AuthError"
+	JWTFrame = "JWT"
+	UserListFrame = "UserList"
+	UserInfoFrame = "UserInfo"
+	UserUpdateFrame = "UserUpdate"
+	UserDeleteFrame = "UserDelete"
+	CategoryFrame = "Category"
+	CategoryListFrame = "CategoryList"
+	CategoryUpdateFrame = "CategoryUpdate"
+	CategoryDeleteFrame = "CategoryDelete"
+	CategoryErrorFrame = "CategoryError"
+	TopicFrame = "Topic"
+	CommentFrame = "Comment"
+	UserFrame = "User"
 )
 
 type Frame struct {
-	Type      int    `json:"type"`
+	Type      string `json:"type"`
 	Data      string `json:"data"`
-	RequestID string `json:"ri"`
+	RequestID string `json:"requestId"`
+}
+
+func (frame Frame) BindJSON(obj interface{}) error {
+	return json.Unmarshal([]byte(frame.Data), obj)
 }

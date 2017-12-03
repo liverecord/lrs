@@ -14,11 +14,11 @@ import (
 
 type User struct {
 	Model
-	Email    string          `validator:"email" json:"email"`
+	Email    string          `validator:"email" gorm:"unique_index" json:"email"`
 	Password string          `json:"-"`
 	Hash     string          `json:"-"`
 	Name     string          `json:"name"`
-	Slug     string          `json:"slug"`
+	Slug     string          `json:"slug" gorm:"unique_index"`
 	Picture  string          `json:"picture"`
 	About    string          `json:"about"`
 	Gender   string          `json:"gender"`
@@ -35,6 +35,16 @@ type SocialProfile struct {
 	Token     string    `json:"-"`
 	ExpiresAt time.Time `json:"-"`
 	UserId    uint
+}
+
+type Role struct {
+	Role string `json:"role"`
+}
+
+type UserAuthData struct {
+	Email      string `json:"email"`
+	Password   string `json:"password"`
+	RememberMe bool   `json:"rememberMe"`
 }
 
 func randomString(l uint8) string {
@@ -77,12 +87,3 @@ func (u *User) MakeGravatarPicture() string {
 	return gravatar.Avatar(u.Email, 100)
 }
 
-type Role struct {
-	Role string `json:"role"`
-}
-
-type UserAuthData struct {
-	Email      string `json:"email"`
-	Password   string `json:"password"`
-	RememberMe bool   `json:"rememberMe"`
-}

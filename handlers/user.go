@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -23,24 +24,24 @@ type UserInfoRequest struct {
 	Slug string `json:"slug"`
 }
 
-func (Lr *LiveRecord) Login(frame Frame) {
+func (Ctx *AppContext) Login(frame Frame) {
 	var authData UserAuthData
-
-	json.Unmarshal([]byte(frame.Data), &authData)
-	Lr.Logger.Debugf("AuthData: %v", authData)
+	frame.BindJSON(&authData)
+	Ctx.Logger.Debugf("AuthData: %v", authData)
 	var user User
-	Lr.Db.Where("email = ?", authData.Email).First(&user)
-	if user.ID != 0 {
+	authData.Email = strings.ToLower(authData.Email)
+	Ctx.Db.Where("email = ?", authData.Email).First(&user)
+	if Ctx.IsAuthorized() {
 		err := bcrypt.CompareHashAndPassword(
 			S2BA(user.Password),
 			S2BA(authData.Password))
 		if err == nil {
 			// we are cool, password is correct
-			Lr.respondWithToken(user)
-			Lr.User = &user
+			Ctx.respondWithToken(user)
+			Ctx.User = &user
 		} else {
-			Lr.Ws.WriteJSON(Frame{Type: AuthErrorFrame, Data: "PasswordMismatch"})
-			Lr.Logger.WithError(err).Errorf("Cannot authorize user %s %v", user.Email, err)
+			Ctx.Ws.WriteJSON(Frame{Type: AuthErrorFrame, Data: "PasswordMismatch"})
+			Ctx.Logger.WithError(err).Errorf("Cannot authorize user %s %v", user.Email, err)
 		}
 
 	} else {
@@ -50,27 +51,27 @@ func (Lr *LiveRecord) Login(frame Frame) {
 		user.MakeSlug()
 		user.SetPassword(authData.Password)
 		user.Picture = user.MakeGravatarPicture()
-		Lr.Db.Save(&user)
-		Lr.User = &user
-		Lr.respondWithToken(user)
+		Ctx.Db.Save(&user)
+		Ctx.User = &user
+		Ctx.respondWithToken(user)
 	}
 }
 
-func (Lr *LiveRecord) respondWithToken(user User) {
-	uld, err := Lr.generateToken(user)
+func (Ctx *AppContext) respondWithToken(user User) {
+	uld, err := Ctx.generateToken(user)
 	if err == nil {
 		userData, err := json.Marshal(uld)
 		if err == nil {
-			Lr.Ws.WriteJSON(Frame{Type: AuthFrame, Data: string(userData)})
+			Ctx.Ws.WriteJSON(Frame{Type: AuthFrame, Data: string(userData)})
 		} else {
-			Lr.Logger.WithError(err).Error("Cannot marshall user data")
+			Ctx.Logger.WithError(err).Error("Cannot marshall user data")
 		}
 	} else {
-		Lr.Logger.WithError(err).Printf("Cannot generate token %v", err)
+		Ctx.Logger.WithError(err).Printf("Cannot generate token %v", err)
 	}
 }
 
-func (Lr *LiveRecord) generateToken(user User) (UserLoginData, error) {
+func (Ctx *AppContext) generateToken(user User) (UserLoginData, error) {
 	// Create the token
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256,
 		jwt.MapClaims{
@@ -82,69 +83,72 @@ func (Lr *LiveRecord) generateToken(user User) (UserLoginData, error) {
 	var uld UserLoginData
 	var err error
 	uld.User = user
-	uld.Jwt, err = token.SignedString(Lr.Cfg.JwtSignature)
+	uld.Jwt, err = token.SignedString(Ctx.Cfg.JwtSignature)
 	return uld, err
 }
 
-func (Lr *LiveRecord) AuthorizeJWT(tokenString string) {
+func (Ctx *AppContext) AuthorizeJWT(tokenString string) {
 
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		// Don't forget to validate the alg is what you expect:
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return Lr.Cfg.JwtSignature, nil
+		return Ctx.Cfg.JwtSignature, nil
 	})
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 		fmt.Println(claims["uid"], claims["exp"])
-		Lr.Logger.WithFields(logrus.Fields(claims)).Debug("Debugged tokens")
+		Ctx.Logger.WithFields(logrus.Fields(claims)).Debug("Debugged tokens")
 		var user User
-		Lr.Db.Where("id = ? AND hash = ?", claims["uid"], claims["hash"]).First(&user)
+		Ctx.Db.Where("id = ? AND hash = ?", claims["uid"], claims["hash"]).First(&user)
 		if user.ID != 0 {
-			Lr.respondWithToken(user)
+			Ctx.respondWithToken(user)
 		}
 
 	} else {
-		Lr.Logger.Error(err)
+		Ctx.Logger.Error(err)
 	}
 
 }
 
-func  (Lr *LiveRecord) UserInfo(frame Frame) {
+func  (Ctx *AppContext) UserInfo(frame Frame) {
 	var request UserInfoRequest
 	var user User
-	json.Unmarshal([]byte(frame.Data), &request)
-	Lr.Db.Where("id = ? OR slug = ?", request.Slug, request.Slug).First(&user)
+	frame.BindJSON(&request)
+	Ctx.Db.Where("id = ? OR slug = ?", request.Slug, request.Slug).First(&user)
 	if user.ID > 0 {
 		userData, err := json.Marshal(user)
 		if err == nil {
-			Lr.Ws.WriteJSON(Frame{Type: UserInfoFrame, Data: string(userData)})
+			Ctx.Ws.WriteJSON(Frame{Type: UserInfoFrame, Data: string(userData)})
 		} else {
 			logrus.WithError(err)
 		}
 	}
 }
 
-func (Lr *LiveRecord) UserUpdate(frame Frame) {
-	if Lr.User == nil {
+func (Ctx *AppContext) IsAuthorized() bool {
+	return Ctx.User != nil
+}
 
-	} else {
+func (Ctx *AppContext) UserUpdate(frame Frame) {
+	if Ctx.IsAuthorized() {
 		var user User
-		json.Unmarshal([]byte(frame.Data), &user)
-		if Lr.User.ID == user.ID {
-			Lr.Db.First(Lr.User)
-			Lr.User.Email = user.Email
-			Lr.User.Name = user.Name
-			Lr.User.Gender = user.Gender
-			Lr.Db.Save(Lr.User)
-			Lr.respondWithToken(*Lr.User)
+		//json.Unmarshal([]byte(frame.Data), &user)
+		frame.BindJSON(&user)
+		if Ctx.User.ID == user.ID {
+			Ctx.Db.First(Ctx.User)
+			Ctx.User.Email = user.Email
+			Ctx.User.Name = user.Name
+			Ctx.User.Gender = user.Gender
+			Ctx.Db.Save(Ctx.User)
+			Ctx.respondWithToken(*Ctx.User)
 		}
 	}
 }
 
-func (Lr *LiveRecord) UserDelete(frame Frame) {
+func (Ctx *AppContext) UserDelete(frame Frame) {
 	var user User
-	json.Unmarshal([]byte(frame.Data), &user)
-	Lr.Db.Delete(&user)
+	frame.BindJSON(&user)
+	Ctx.Db.Delete(&user)
 }
