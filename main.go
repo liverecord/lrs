@@ -29,8 +29,13 @@ type Message struct {
 	Message string `json:"password"`
 }
 
-var clients = make(map[*websocket.Conn]bool) // connected clients
-var broadcast = make(chan Message)           // broadcast channel
+type LrClient struct {
+	Conn *websocket.Conn
+	User *User
+}
+
+var clients = make(SocketClientsMap) // connected clients
+var broadcast = make(chan Message)   // broadcast channel
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		return true
@@ -39,11 +44,11 @@ var upgrader = websocket.Upgrader{
 
 func handleConnections(w http.ResponseWriter, r *http.Request) {
 
-	logger.Print("handleConnections")
+	logger.Debug("handleConnections")
 	// Upgrade initial GET request to a websocket
 	ws, err := upgrader.Upgrade(w, r, nil)
 	jwt := r.FormValue("jwt")
-	logger.Printf("JWT: %s", jwt)
+	logger.WithFields(logrus.Fields{"JWT": jwt}).Info("Request")
 	if err != nil {
 		logger.WithError(err).Error("Cannot upgrade protocol")
 	} else {
@@ -58,10 +63,11 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 
 		// our registry
 		var lr = AppContext{
-			Db:     Db,
-			Cfg:    Cfg,
-			Logger: logger,
-			Ws:     ws,
+			Db:      Db,
+			Cfg:     Cfg,
+			Logger:  logger,
+			Ws:      ws,
+			Clients: &clients,
 		}
 
 		if len(jwt) > 0 {
@@ -81,7 +87,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 				delete(clients, ws)
 				break
 			} else {
-				log.Printf("Frame: %v", frame)
+				logrus.Printf("Frame: %v", frame)
 
 				switch frame.Type {
 				case PingFrame:
@@ -99,11 +105,19 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 				case UserInfoFrame:
 					lr.UserInfo(frame)
 
+				case UserListFrame:
+					lr.UsersList(frame)
+
 				case UserUpdateFrame:
 					lr.UserUpdate(frame)
 
 				case CategoryListFrame:
 					lr.CategoryList(frame)
+
+				case TopicUpdateFrame:
+					lr.TopicSave(frame)
+				case TopicListFrame:
+					lr.TopicList(frame)
 				}
 
 			}
@@ -140,7 +154,7 @@ func main() {
 	logger.Out = os.Stdout
 
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		logger.Fatal("Error loading .env file")
 	}
 	// open db connection
 	Db, err = gorm.Open(
@@ -158,8 +172,10 @@ func main() {
 
 	if err == nil {
 		defer Db.Close()
-		Db.LogMode(BoolEnv("DEBUG", "false"))
-
+		if BoolEnv("DEBUG", "false") {
+			Db.LogMode(true)
+			Db.Debug()
+		}
 		Db.AutoMigrate(&ServerConfig{})
 		Db.AutoMigrate(&User{})
 		Db.AutoMigrate(&Topic{})
@@ -168,20 +184,20 @@ func main() {
 		Db.AutoMigrate(&SocialProfile{})
 		Db.AutoMigrate(&Role{})
 
-		var cfgr ServerConfig
-		Db.First(&cfgr)
+		var configRecord ServerConfig
+		Db.First(&configRecord)
 
-		if cfgr.ID == 0 {
-			cfgr.JwtSignature = make([]byte, 256)
-			_, err = io.ReadFull(rand.Reader, cfgr.JwtSignature)
+		if configRecord.ID == 0 {
+			configRecord.JwtSignature = make([]byte, 256)
+			_, err = io.ReadFull(rand.Reader, configRecord.JwtSignature)
 			logger.WithError(err)
-			Db.Save(&cfgr)
+			Db.Save(&configRecord)
 		}
 
-		Cfg = &cfgr
+		Cfg = &configRecord
 
 		addr := Env("LISTEN_ADDR", ":8000")
-		log.Printf("Listening on %s", addr)
+		logger.Printf("Listening on %s", addr)
 		err := http.ListenAndServe(addr, nil)
 		if err != nil {
 			logger.WithError(err).Fatal("Can't bind address & port")
@@ -190,6 +206,6 @@ func main() {
 	} else {
 		logger.WithError(err).Fatal("Can't bind address & port")
 
-		panic(err)
+		logger.Panic(err)
 	}
 }

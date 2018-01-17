@@ -9,6 +9,7 @@ import (
 
 	"github.com/liverecord/server/common/common"
 )
+type SocketClientsMap map[*websocket.Conn]bool
 
 type AppContext struct {
 	Cfg    *common.ServerConfig
@@ -16,4 +17,5 @@ type AppContext struct {
 	Logger *logrus.Logger
 	Ws     *websocket.Conn
 	User   *model.User
+	Clients *SocketClientsMap
 }

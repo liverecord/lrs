@@ -25,7 +25,7 @@ type User struct {
 	Rank     float32         `json:"rank"`
 	Online   bool            `json:"online"`
 	Roles    []Role          `json:"roles"`
-	Profiles []SocialProfile `json:"profiles"`
+	Profiles []SocialProfile `json:"profiles" gorm:"[]"`
 }
 
 type SocialProfile struct {

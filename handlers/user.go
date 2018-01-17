@@ -24,6 +24,11 @@ type UserInfoRequest struct {
 	Slug string `json:"slug"`
 }
 
+type UsersSearchRequest struct {
+	Term string `json:"term"`
+	ExcludeUsers []uint `json:"exclude"`
+}
+
 func (Ctx *AppContext) Login(frame Frame) {
 	var authData UserAuthData
 	frame.BindJSON(&authData)
@@ -104,6 +109,7 @@ func (Ctx *AppContext) AuthorizeJWT(tokenString string) {
 		Ctx.Db.Where("id = ? AND hash = ?", claims["uid"], claims["hash"]).First(&user)
 		if user.ID != 0 {
 			Ctx.respondWithToken(user)
+			Ctx.User = &user
 		}
 
 	} else {
@@ -122,13 +128,17 @@ func  (Ctx *AppContext) UserInfo(frame Frame) {
 		if err == nil {
 			Ctx.Ws.WriteJSON(Frame{Type: UserInfoFrame, Data: string(userData)})
 		} else {
-			logrus.WithError(err)
+			Ctx.Logger.WithError(err)
 		}
 	}
 }
 
+func (Ctx *AppContext) broadcast(frame Frame) {
+
+}
+
 func (Ctx *AppContext) IsAuthorized() bool {
-	return Ctx.User != nil
+	return Ctx.User != nil && Ctx.User.ID > 0
 }
 
 func (Ctx *AppContext) UserUpdate(frame Frame) {
@@ -146,6 +156,31 @@ func (Ctx *AppContext) UserUpdate(frame Frame) {
 		}
 	}
 }
+
+func (Ctx *AppContext) UsersList(frame Frame) {
+	var request UsersSearchRequest
+	var users []User
+	frame.BindJSON(&request)
+	a := Ctx.Db.Where(
+		"name LIKE ? OR slug = ? OR email LIKE ? ",
+		request.Term + "%",
+		request.Term,
+		"%" + request.Term + "%",
+		)
+	if len(request.ExcludeUsers) > 0 {
+		a = a.Where(" id NOT IN ( ? )", request.ExcludeUsers)
+	}
+	a.Limit(10).Find(&users)
+	if users != nil {
+		userData, err := json.Marshal(users)
+		if err == nil {
+			Ctx.Ws.WriteJSON(Frame{Type: UserListFrame, Data: string(userData)})
+		} else {
+			Ctx.Logger.WithError(err)
+		}
+	}
+}
+
 
 func (Ctx *AppContext) UserDelete(frame Frame) {
 	var user User
