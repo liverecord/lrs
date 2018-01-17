@@ -42,7 +42,7 @@ func  (Ctx *AppContext) TopicSave(frame Frame) {
 				// this is new topic
 				// topic.User = *(Ctx.User)
 				topic.ID = 0
-				err = Ctx.Db.Select("acl").Save(&topic).Error
+				err = Ctx.Db.Omit("users").Save(&topic).Error
 			}
 			if err != nil {
 				Ctx.Logger.WithError(err).Error("Unable to save topic")
