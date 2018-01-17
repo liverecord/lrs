@@ -40,7 +40,6 @@ func  (Ctx *AppContext) TopicSave(frame Frame) {
 				}
 			} else {
 				// this is new topic
-				// topic.User = *(Ctx.User)
 				topic.ID = 0
 				err = Ctx.Db.Omit("users").Save(&topic).Error
 			}
