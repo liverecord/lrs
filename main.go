@@ -172,7 +172,7 @@ func main() {
 
 	if err == nil {
 		defer Db.Close()
-		if BoolEnv("DEBUG", "false") {
+		if BoolEnv("DEBUG", false) {
 			Db.LogMode(true)
 			Db.Debug()
 		}

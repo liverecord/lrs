@@ -16,10 +16,13 @@ func Env(key, def string) string {
 	return def
 }
 
-func BoolEnv(key, def string) bool {
-	val := Env(key, def)
-	val = strings.ToLower(val)
-	return val == "true"
+func BoolEnv(key string, def bool) bool {
+	val, set := os.LookupEnv(key)
+	if set {
+		return strings.ToLower(val) == "true"
+	}
+
+	return def
 }
 
 func FilterHtml(html string) string {

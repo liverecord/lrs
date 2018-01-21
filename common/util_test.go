@@ -1,8 +1,8 @@
 package common
 
 import (
-	"testing"
 	"os"
+	"testing"
 )
 
 func TestEnv_ExistingValue(t *testing.T) {
@@ -25,5 +25,43 @@ func TestEnv_NotExistingValue(t *testing.T) {
 	res := Env(key, def)
 	if res != def {
 		t.Errorf("I expected to get \"%s\" but got \"%s\"", def, res)
+	}
+}
+
+func TestBoolEnv_ExistingValue(t *testing.T) {
+	testCases := map[string]bool{
+		"TRUE":  true,
+		"true":  true,
+		"FALSE": false,
+		"false": false,
+	}
+
+	key := "TEST_KEY"
+
+	for envValue, expectedValue := range testCases {
+		os.Setenv(key, envValue)
+
+		res := BoolEnv(key, !expectedValue)
+		if res != expectedValue {
+			t.Errorf("I expected to get %v but got %v", expectedValue, res)
+		}
+
+		os.Unsetenv(key)
+	}
+}
+
+func TestBoolEnv_NotExistingValue(t *testing.T) {
+	testCases := map[bool]bool{
+		true:  true,
+		false: false,
+	}
+
+	key := "TEST_KEY"
+
+	for defValue, expectedValue := range testCases {
+		res := BoolEnv(key, defValue)
+		if res != expectedValue {
+			t.Errorf("I expected to get %v but got %v", expectedValue, res)
+		}
 	}
 }
