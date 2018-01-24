@@ -6,6 +6,6 @@ type Category struct {
 	Slug        string `sql:"index" json:"slug"`
 	Description string `json:"description"`
 	Order       int    `json:"order"`
-	Active       bool    `json:"order"`
-	Updates       int    `json:"order"`
+	Active      bool   `json:"order"`
+	Updates     int    `json:"order"`
 }

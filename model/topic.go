@@ -9,7 +9,7 @@ import (
 
 type Topic struct {
 	Model
-	CategoryID 	  uint
+	CategoryID    uint
 	Category      Category
 	Title         string `json:"title"`
 	Slug          string `sql:"index" json:"slug"`

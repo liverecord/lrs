@@ -9,13 +9,14 @@ import (
 
 	"github.com/liverecord/server/common/common"
 )
+
 type SocketClientsMap map[*websocket.Conn]bool
 
 type AppContext struct {
-	Cfg    *common.ServerConfig
-	Db     *gorm.DB
-	Logger *logrus.Logger
-	Ws     *websocket.Conn
-	User   *model.User
+	Cfg     *common.ServerConfig
+	Db      *gorm.DB
+	Logger  *logrus.Logger
+	Ws      *websocket.Conn
+	User    *model.User
 	Clients *SocketClientsMap
 }

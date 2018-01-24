@@ -1,6 +1,7 @@
 # lrserver
 LiveRecord server app
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/liverecord/server)](https://goreportcard.com/report/github.com/liverecord/server)
 
 ## Configure
 

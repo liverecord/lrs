@@ -1,8 +1,8 @@
 package common
 
 import (
-	"testing"
 	"os"
+	"testing"
 )
 
 func TestEnv_ExistingValue(t *testing.T) {

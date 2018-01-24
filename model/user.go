@@ -86,4 +86,3 @@ func (u *User) MakeSlug() {
 func (u *User) MakeGravatarPicture() string {
 	return gravatar.Avatar(u.Email, 100)
 }
-

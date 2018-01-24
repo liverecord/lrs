@@ -5,10 +5,9 @@ import (
 
 	. "github.com/liverecord/server/common/frame"
 	"github.com/liverecord/server/model"
-
 )
 
-func  (Ctx *AppContext) CategoryList(frame Frame) {
+func (Ctx *AppContext) CategoryList(frame Frame) {
 	var categories []model.Category
 	Ctx.Db.Find(&categories)
 	cats, err := json.Marshal(categories)

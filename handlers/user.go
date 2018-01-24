@@ -25,7 +25,7 @@ type UserInfoRequest struct {
 }
 
 type UsersSearchRequest struct {
-	Term string `json:"term"`
+	Term         string `json:"term"`
 	ExcludeUsers []uint `json:"exclude"`
 }
 
@@ -118,7 +118,7 @@ func (Ctx *AppContext) AuthorizeJWT(tokenString string) {
 
 }
 
-func  (Ctx *AppContext) UserInfo(frame Frame) {
+func (Ctx *AppContext) UserInfo(frame Frame) {
 	var request UserInfoRequest
 	var user User
 	frame.BindJSON(&request)
@@ -163,10 +163,10 @@ func (Ctx *AppContext) UsersList(frame Frame) {
 	frame.BindJSON(&request)
 	a := Ctx.Db.Where(
 		"name LIKE ? OR slug = ? OR email LIKE ? ",
-		request.Term + "%",
+		request.Term+"%",
 		request.Term,
-		"%" + request.Term + "%",
-		)
+		"%"+request.Term+"%",
+	)
 	if len(request.ExcludeUsers) > 0 {
 		a = a.Where(" id NOT IN ( ? )", request.ExcludeUsers)
 	}
@@ -180,7 +180,6 @@ func (Ctx *AppContext) UsersList(frame Frame) {
 		}
 	}
 }
-
 
 func (Ctx *AppContext) UserDelete(frame Frame) {
 	var user User

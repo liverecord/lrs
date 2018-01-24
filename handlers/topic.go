@@ -2,13 +2,13 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 
 	. "github.com/liverecord/server/common/frame"
 	"github.com/liverecord/server/model"
-
 )
 
-func  (Ctx *AppContext) TopicList(frame Frame) {
+func (Ctx *AppContext) TopicList(frame Frame) {
 	var topics []model.Topic
 	//Ctx.Db.Joins("LEFT JOIN categories ON (topics.category_id = categories.id)").Select("*").Find(&topics)
 	Ctx.Db.Preload("Category").Find(&topics)
@@ -20,8 +20,7 @@ func  (Ctx *AppContext) TopicList(frame Frame) {
 	}
 }
 
-
-func  (Ctx *AppContext) TopicSave(frame Frame) {
+func (Ctx *AppContext) TopicSave(frame Frame) {
 	if Ctx.IsAuthorized() {
 		var topic model.Topic
 		err := frame.BindJSON(&topic)
@@ -41,7 +40,8 @@ func  (Ctx *AppContext) TopicSave(frame Frame) {
 			} else {
 				// this is new topic
 				topic.ID = 0
-				err = Ctx.Db.Omit("users").Save(&topic).Error
+				fmt.Println(frame.Data)
+				err = Ctx.Db.Omit("acl.email").Save(&topic).Error
 			}
 			if err != nil {
 				Ctx.Logger.WithError(err).Error("Unable to save topic")
