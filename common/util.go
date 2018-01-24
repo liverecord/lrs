@@ -2,7 +2,8 @@ package common
 
 import (
 	"os"
-	"strings"
+
+	"strconv"
 
 	"github.com/microcosm-cc/bluemonday"
 )
@@ -18,11 +19,16 @@ func Env(key, def string) string {
 
 func BoolEnv(key string, def bool) bool {
 	val, set := os.LookupEnv(key)
-	if set {
-		return strings.ToLower(val) == "true"
+	if !set {
+		return def
 	}
 
-	return def
+	boolVal, err := strconv.ParseBool(val)
+	if err != nil {
+		return def
+	}
+
+	return boolVal
 }
 
 func FilterHtml(html string) string {
