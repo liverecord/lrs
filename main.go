@@ -2,10 +2,12 @@ package main
 
 import (
 	"crypto/rand"
+
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"reflect"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/jinzhu/gorm"
@@ -77,8 +79,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 		for {
 			// var msg Message
 			var frame Frame
-			// Read in a new message as JSON and map it to a Message object
-			//messageType, p, err := ws.ReadMessage()
+			// Read in a new message as JSON and map it to a Frame object
 			err := ws.ReadJSON(&frame)
 
 			//log.Printf("read error: %v, message: %d bytes %s", err, messageType, p)
@@ -87,39 +88,19 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 				delete(clients, ws)
 				break
 			} else {
-				logrus.Printf("Frame: %v", frame)
-
-				switch frame.Type {
-				case PingFrame:
-					ws.WriteJSON(Frame{
-						Type: PingFrame,
-						Data: "Pong",
-					})
-
-				case AuthFrame:
-					lr.Login(frame)
-
-				case JWTFrame:
-					lr.AuthorizeJWT(frame.Data)
-
-				case UserInfoFrame:
-					lr.UserInfo(frame)
-
-				case UserListFrame:
-					lr.UsersList(frame)
-
-				case UserUpdateFrame:
-					lr.UserUpdate(frame)
-
-				case CategoryListFrame:
-					lr.CategoryList(frame)
-
-				case TopicUpdateFrame:
-					lr.TopicSave(frame)
-				case TopicListFrame:
-					lr.TopicList(frame)
+				logrus.Debugf("Frame: %v", frame)
+				// We use reflection to call methods
+				// Method name must match Frame.Type
+				lrv := reflect.ValueOf(&lr)
+				frv := reflect.ValueOf(frame)
+				method := lrv.MethodByName(frame.Type)
+				if method.IsValid() &&
+					method.Type().NumIn() == 1 &&
+					method.Type().In(0).AssignableTo(reflect.TypeOf(Frame{})) {
+					method.Call([]reflect.Value{frv})
+				} else {
+					lr.Logger.Errorf("method %s is invalid", frame.Type)
 				}
-
 			}
 			// Send the newly received message to the broadcast channel
 			// broadcast <- msg
@@ -175,6 +156,7 @@ func main() {
 		if BoolEnv("DEBUG", false) {
 			Db.LogMode(true)
 			Db.Debug()
+			logger.SetLevel(logrus.DebugLevel)
 		}
 		Db.AutoMigrate(&ServerConfig{})
 		Db.AutoMigrate(&User{})
