@@ -88,7 +88,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 				delete(clients, ws)
 				break
 			} else {
-				logrus.Debugf("Frame: %v", frame)
+				logger.Debugf("Frame: %v", frame)
 				// We use reflection to call methods
 				// Method name must match Frame.Type
 				lrv := reflect.ValueOf(&lr)
@@ -178,7 +178,7 @@ func main() {
 
 		Cfg = &configRecord
 
-		addr := Env("LISTEN_ADDR", ":8000")
+		addr := Env("LISTEN_ADDR", "127.0.0.1:8000")
 		logger.Printf("Listening on %s", addr)
 		err := http.ListenAndServe(addr, nil)
 		if err != nil {

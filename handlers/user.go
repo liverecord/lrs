@@ -157,7 +157,7 @@ func (Ctx *AppContext) UserUpdate(frame Frame) {
 	}
 }
 
-func (Ctx *AppContext) UsersList(frame Frame) {
+func (Ctx *AppContext) UserList(frame Frame) {
 	var request UsersSearchRequest
 	var users []User
 	frame.BindJSON(&request)

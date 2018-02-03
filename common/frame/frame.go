@@ -17,7 +17,7 @@ const (
 	CategoryDeleteFrame = "CategoryDelete"
 	CategoryErrorFrame  = "CategoryError"
 	TopicFrame          = "Topic"
-	TopicUpdateFrame    = "TopicUpdate"
+	TopicUpdateFrame    = "TopicSave"
 	TopicListFrame      = "TopicList"
 	CommentFrame        = "Comment"
 	UserFrame           = "User"

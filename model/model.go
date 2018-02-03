@@ -1,6 +1,9 @@
 package model
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 type Model struct {
 	ID        uint       `gorm:"primary_key" json:"id"`
@@ -9,22 +12,7 @@ type Model struct {
 	DeletedAt *time.Time `sql:"index" json:"deletedAt,omitempty"`
 }
 
-/*
-type User struct {
-	Model
-	Name string
+func (m *Model) ToJSON() string {
+	r, _ := json.Marshal(m)
+	return string(r)
 }
-
-type Folder struct {
-	Model
-	Name string
-}
-
-type File struct {
-	Model
-	Name string
-	CategoryID 	  uint
-	Category      Category
-	Acl           []User `json:"acl" gorm:"many2many:file_acl"`
-}
-*/

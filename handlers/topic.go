@@ -4,14 +4,48 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/jinzhu/gorm"
+	//"github.com/jinzhu/gorm"
 	. "github.com/liverecord/server/common/frame"
 	"github.com/liverecord/server/model"
 )
 
-func (Ctx *AppContext) TopicList(frame Frame) {
+func (Ctx *AppContext) Topic(frame Frame) {
 	var topics []model.Topic
 	//Ctx.Db.Joins("LEFT JOIN categories ON (topics.category_id = categories.id)").Select("*").Find(&topics)
 	Ctx.Db.Preload("Category").Find(&topics)
+	ts, err := json.Marshal(topics)
+	if err == nil {
+		Ctx.Ws.WriteJSON(Frame{Type: TopicListFrame, Data: string(ts)})
+	} else {
+		Ctx.Logger.WithError(err).Error()
+	}
+}
+
+func (Ctx *AppContext) TopicList(frame Frame) {
+	var topics []model.Topic
+	var category model.Category
+	//Ctx.Db.Joins("LEFT JOIN categories ON (topics.category_id = categories.id)").Select("*").Find(&topics)
+	var data map[string]string
+	frame.BindJSON(&data)
+	Ctx.Logger.Debugln(data)
+	var query *gorm.DB
+	//query = Ctx.Db.Preload("Category", "slug = ?", "abc")
+	query = Ctx.Db.Preload("Category")
+
+	if cat_slug, ok := data["category"]; ok {
+		Ctx.Logger.Debugln("category", cat_slug)
+
+		Ctx.Db.Where("slug = ?", cat_slug).First(&category)
+		query = query.Where("category_id = ?", category.ID)
+	}
+
+	query.
+		Preload("Category").
+		Select("id,title,slug,created_at,updated_at,category_id").
+		Order("updated_at DESC,created_at DESC").
+		Limit(100).
+		Find(&topics)
 	ts, err := json.Marshal(topics)
 	if err == nil {
 		Ctx.Ws.WriteJSON(Frame{Type: TopicListFrame, Data: string(ts)})
@@ -41,7 +75,8 @@ func (Ctx *AppContext) TopicSave(frame Frame) {
 				// this is new topic
 				topic.ID = 0
 				fmt.Println(frame.Data)
-				err = Ctx.Db.Omit("acl.email").Save(&topic).Error
+				err = Ctx.Db.Set("gorm:save_associations", false).Save(&topic).Error
+				Ctx.Ws.WriteJSON(Frame{Type: TopicUpdateFrame, Data: topic.ToJSON()})
 			}
 			if err != nil {
 				Ctx.Logger.WithError(err).Error("Unable to save topic")
