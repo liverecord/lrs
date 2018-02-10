@@ -28,18 +28,14 @@ func (Ctx *AppContext) TopicList(frame Frame) {
 	//Ctx.Db.Joins("LEFT JOIN categories ON (topics.category_id = categories.id)").Select("*").Find(&topics)
 	var data map[string]string
 	frame.BindJSON(&data)
-	Ctx.Logger.Debugln(data)
 	var query *gorm.DB
-	//query = Ctx.Db.Preload("Category", "slug = ?", "abc")
 	query = Ctx.Db.Preload("Category")
-
 	if cat_slug, ok := data["category"]; ok {
-		Ctx.Logger.Debugln("category", cat_slug)
-
 		Ctx.Db.Where("slug = ?", cat_slug).First(&category)
-		query = query.Where("category_id = ?", category.ID)
+		if category.ID > 0 {
+			query = query.Where("category_id = ?", category.ID)
+		}
 	}
-
 	query.
 		Preload("Category").
 		Select("id,title,slug,created_at,updated_at,category_id").
