@@ -7,13 +7,13 @@ import (
 	"github.com/liverecord/server/model"
 )
 
-func (Ctx *AppContext) CategoryList(frame Frame) {
+func CategoryList(ctx *AppContext, f Frame) (Frame, error) {
 	var categories []model.Category
-	Ctx.Db.Find(&categories)
+	ctx.Db.Find(&categories)
 	cats, err := json.Marshal(categories)
-	if err == nil {
-		Ctx.Ws.WriteJSON(Frame{Type: CategoryListFrame, Data: string(cats)})
-	} else {
-		Ctx.Logger.WithError(err)
+	if err != nil {
+		return Frame{}, err
 	}
+
+	return Frame{Type: CategoryListFrame, Data: string(cats)}, nil
 }

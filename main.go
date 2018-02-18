@@ -20,11 +20,14 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/joho/godotenv"
+	"github.com/liverecord/server/router"
 )
 
 var Db *gorm.DB
 var Cfg *ServerConfig
 var logger = logrus.New()
+
+var frameRouter = router.NewFrame()
 
 type Message struct {
 	Email   string `json:"email"`
@@ -87,8 +90,12 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 				log.Print(err)
 				delete(clients, ws)
 				break
-			} else {
-				logger.Debugf("Frame: %v", frame)
+			}
+
+			logger.Debugf("Frame: %v", frame)
+			f, err := frameRouter.Process(&lr, frame)
+			// Here we keep default behaviour until
+			if err == router.ErrNotRegisteredFrameType {
 				// We use reflection to call methods
 				// Method name must match Frame.Type
 				lrv := reflect.ValueOf(&lr)
@@ -101,9 +108,11 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 				} else {
 					lr.Logger.Errorf("method %s is invalid", frame.Type)
 				}
+			} else if err != nil {
+				lr.Logger.WithError(err)
+			} else {
+				lr.Ws.WriteJSON(f)
 			}
-			// Send the newly received message to the broadcast channel
-			// broadcast <- msg
 		}
 	}
 }
@@ -148,6 +157,8 @@ func main() {
 	http.HandleFunc("/ws", handleConnections)
 	http.HandleFunc("/api/oauth/", handleOauth)
 	http.HandleFunc("/api/oauth/facebook/", handleOauth)
+
+	frameRouter.AddHandler(CategoryListFrame, CategoryList)
 
 	go handleBroadcastMessages()
 
