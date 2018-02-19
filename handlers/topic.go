@@ -12,7 +12,6 @@ import (
 
 func (Ctx *AppContext) Topic(frame Frame) {
 	var topics []model.Topic
-	//Ctx.Db.Joins("LEFT JOIN categories ON (topics.category_id = categories.id)").Select("*").Find(&topics)
 	Ctx.Db.Preload("Category").Find(&topics)
 	ts, err := json.Marshal(topics)
 	if err == nil {
@@ -25,7 +24,6 @@ func (Ctx *AppContext) Topic(frame Frame) {
 func (Ctx *AppContext) TopicList(frame Frame) {
 	var topics []model.Topic
 	var category model.Category
-	//Ctx.Db.Joins("LEFT JOIN categories ON (topics.category_id = categories.id)").Select("*").Find(&topics)
 	var data map[string]string
 	frame.BindJSON(&data)
 	var query *gorm.DB
