@@ -12,13 +12,13 @@ import (
 
 	. "github.com/liverecord/server/common/common"
 	. "github.com/liverecord/server/common/frame"
-	. "github.com/liverecord/server/model"
+	"github.com/liverecord/server/model"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type UserLoginData struct {
-	Jwt  string `json:"jwt"`
-	User User   `json:"user"`
+	Jwt  string     `json:"jwt"`
+	User model.User `json:"user"`
 }
 
 type UserInfoRequest struct {
@@ -31,10 +31,10 @@ type UsersSearchRequest struct {
 }
 
 func (Ctx *AppContext) Auth(frame Frame) {
-	var authData UserAuthData
+	var authData model.UserAuthData
 	frame.BindJSON(&authData)
 	Ctx.Logger.Debugf("AuthData: %v", authData)
-	var user User
+	var user model.User
 	authData.Email = strings.ToLower(authData.Email)
 	Ctx.Db.Where("email = ?", authData.Email).First(&user)
 	if Ctx.IsAuthorized() {
@@ -53,7 +53,7 @@ func (Ctx *AppContext) Auth(frame Frame) {
 	} else {
 		user.Email = authData.Email
 		user.Name = common.StripTags(user.MakeNameFromEmail())
-		user.Roles = []Role{}
+		user.Roles = []model.Role{}
 		user.MakeSlug()
 		user.SetPassword(authData.Password)
 		user.Picture = user.MakeGravatarPicture()
@@ -63,7 +63,7 @@ func (Ctx *AppContext) Auth(frame Frame) {
 	}
 }
 
-func (Ctx *AppContext) respondWithToken(user User) {
+func (Ctx *AppContext) respondWithToken(user model.User) {
 	uld, err := Ctx.generateToken(user)
 	if err == nil {
 		userData, err := json.Marshal(uld)
@@ -77,7 +77,7 @@ func (Ctx *AppContext) respondWithToken(user User) {
 	}
 }
 
-func (Ctx *AppContext) generateToken(user User) (UserLoginData, error) {
+func (Ctx *AppContext) generateToken(user model.User) (UserLoginData, error) {
 	// Create the token
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256,
 		jwt.MapClaims{
@@ -106,7 +106,7 @@ func (Ctx *AppContext) AuthorizeJWT(tokenString string) {
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 		fmt.Println(claims["uid"], claims["exp"])
 		Ctx.Logger.WithFields(logrus.Fields(claims)).Debug("Debugged tokens")
-		var user User
+		var user model.User
 		Ctx.Db.Where("id = ? AND hash = ?", claims["uid"], claims["hash"]).First(&user)
 		if user.ID != 0 {
 			Ctx.respondWithToken(user)
@@ -121,7 +121,7 @@ func (Ctx *AppContext) AuthorizeJWT(tokenString string) {
 
 func (Ctx *AppContext) UserInfo(frame Frame) {
 	var request UserInfoRequest
-	var user User
+	var user model.User
 	frame.BindJSON(&request)
 	Ctx.Db.Where("id = ? OR slug = ?", request.Slug, request.Slug).First(&user)
 	if user.ID > 0 {
@@ -144,7 +144,7 @@ func (Ctx *AppContext) IsAuthorized() bool {
 
 func (Ctx *AppContext) UserUpdate(frame Frame) {
 	if Ctx.IsAuthorized() {
-		var user User
+		var user model.User
 		//json.Unmarshal([]byte(frame.Data), &user)
 		frame.BindJSON(&user)
 		if Ctx.User.ID == user.ID {
@@ -160,7 +160,7 @@ func (Ctx *AppContext) UserUpdate(frame Frame) {
 
 func (Ctx *AppContext) UserList(frame Frame) {
 	var request UsersSearchRequest
-	var users []User
+	var users []model.User
 	frame.BindJSON(&request)
 	a := Ctx.Db.Where(
 		"name LIKE ? OR slug = ? OR email LIKE ? ",
@@ -183,7 +183,7 @@ func (Ctx *AppContext) UserList(frame Frame) {
 }
 
 func (Ctx *AppContext) UserDelete(frame Frame) {
-	var user User
+	var user model.User
 	frame.BindJSON(&user)
 	Ctx.Db.Delete(&user)
 }

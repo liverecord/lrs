@@ -19,6 +19,7 @@ const (
 	TopicFrame          = "Topic"
 	TopicUpdateFrame    = "TopicSave"
 	TopicListFrame      = "TopicList"
+	TopicDeleteFrame    = "TopicDelete"
 	CommentFrame        = "Comment"
 	UserFrame           = "User"
 )

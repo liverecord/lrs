@@ -15,8 +15,8 @@ import (
 	. "github.com/liverecord/server/common"
 	. "github.com/liverecord/server/common/common"
 	. "github.com/liverecord/server/common/frame"
-	. "github.com/liverecord/server/handlers"
-	. "github.com/liverecord/server/model"
+	"github.com/liverecord/server/handlers"
+	"github.com/liverecord/server/model"
 
 	"github.com/gorilla/websocket"
 	"github.com/joho/godotenv"
@@ -36,11 +36,11 @@ type Message struct {
 
 type LrClient struct {
 	Conn *websocket.Conn
-	User *User
+	User *model.User
 }
 
-var clients = make(SocketClientsMap) // connected clients
-var broadcast = make(chan Message)   // broadcast channel
+var clients = make(handlers.SocketClientsMap) // connected clients
+var broadcast = make(chan Message)            // broadcast channel
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		return true
@@ -67,7 +67,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 		ws.WriteJSON(w)
 
 		// our registry
-		var lr = AppContext{
+		var lr = handlers.AppContext{
 			Db:      Db,
 			Cfg:     Cfg,
 			Logger:  logger,
@@ -109,7 +109,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 					lr.Logger.Errorf("method %s is invalid", frame.Type)
 				}
 			} else if err != nil {
-				lr.Logger.WithError(err)
+				lr.Logger.WithError(err).Error()
 			} else {
 				lr.Ws.WriteJSON(f)
 			}
@@ -158,7 +158,11 @@ func main() {
 	http.HandleFunc("/api/oauth/", handleOauth)
 	http.HandleFunc("/api/oauth/facebook/", handleOauth)
 
-	frameRouter.AddHandler(CategoryListFrame, CategoryList)
+	frameRouter.AddHandler(CategoryListFrame, handlers.CategoryList)
+	frameRouter.AddHandler(TopicFrame, handlers.Topic)
+	frameRouter.AddHandler(TopicListFrame, handlers.TopicList)
+	frameRouter.AddHandler(TopicDeleteFrame, handlers.TopicDelete)
+	frameRouter.AddHandler(TopicUpdateFrame, handlers.TopicSave)
 
 	go handleBroadcastMessages()
 
@@ -170,14 +174,14 @@ func main() {
 			logger.SetLevel(logrus.DebugLevel)
 		}
 		Db.AutoMigrate(&ServerConfig{})
-		Db.AutoMigrate(&User{})
-		Db.AutoMigrate(&Topic{})
-		Db.AutoMigrate(&Comment{})
-		Db.AutoMigrate(&Category{})
-		Db.AutoMigrate(&SocialProfile{})
-		Db.AutoMigrate(&Role{})
-		Db.AutoMigrate(&CommentStatus{})
-		Db.AutoMigrate(&Attachment{})
+		Db.AutoMigrate(&model.User{})
+		Db.AutoMigrate(&model.Topic{})
+		Db.AutoMigrate(&model.Comment{})
+		Db.AutoMigrate(&model.Category{})
+		Db.AutoMigrate(&model.SocialProfile{})
+		Db.AutoMigrate(&model.Role{})
+		Db.AutoMigrate(&model.CommentStatus{})
+		Db.AutoMigrate(&model.Attachment{})
 
 		var configRecord ServerConfig
 		Db.First(&configRecord)
