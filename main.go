@@ -110,7 +110,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 				}
 			} else if err != nil {
 				lr.Logger.WithError(err).Error()
-			} else {
+			} else if f.Type != "" {
 				lr.Ws.WriteJSON(f)
 			}
 		}
@@ -162,7 +162,7 @@ func main() {
 	frameRouter.AddHandler(TopicFrame, handlers.Topic)
 	frameRouter.AddHandler(TopicListFrame, handlers.TopicList)
 	frameRouter.AddHandler(TopicDeleteFrame, handlers.TopicDelete)
-	frameRouter.AddHandler(TopicUpdateFrame, handlers.TopicSave)
+	frameRouter.AddHandler(TopicSaveFrame, handlers.TopicSave)
 
 	go handleBroadcastMessages()
 

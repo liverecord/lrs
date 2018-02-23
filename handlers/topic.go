@@ -146,17 +146,17 @@ func TopicSave(ctx *AppContext, frame Frame) (Frame, error) {
 
 	// existing topic
 	if topic.ID > 0 {
-		return Frame{}, updateTopic(ctx, topic)
+		return Frame{}, topicUpdate(ctx, topic)
 	}
 
 	// new topic
 	topic.ID = 0
 	topic.User.ID = ctx.User.ID
 	err = ctx.Db.Set("gorm:association_autoupdate", false).Save(&topic).Error
-	return Frame{Type: TopicUpdateFrame, Data: topic.ToJSON()}, nil
+	return Frame{Type: TopicSaveFrame, Data: topic.ToJSON()}, nil
 }
 
-func updateTopic(ctx *AppContext, topic model.Topic) error {
+func topicUpdate(ctx *AppContext, topic model.Topic) error {
 	// find topic in DB and update it
 	var oldTopic model.Topic
 	ctx.Db.Where("id = ?", topic.ID).First(&oldTopic)
