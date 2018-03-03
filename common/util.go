@@ -31,7 +31,12 @@ func BoolEnv(key string, def bool) bool {
 	return boolVal
 }
 
-func FilterHtml(html string) string {
+func StripTags(html string) string {
+	p := bluemonday.StripTagsPolicy()
+	return p.Sanitize(html)
+}
+
+func SanitizeHtml(html string) string {
 	p := bluemonday.NewPolicy()
 	p.AllowImages()
 	p.AllowLists()

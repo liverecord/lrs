@@ -8,6 +8,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/dgrijalva/jwt-go"
+	"github.com/liverecord/server/common"
 
 	. "github.com/liverecord/server/common/common"
 	. "github.com/liverecord/server/common/frame"
@@ -29,7 +30,7 @@ type UsersSearchRequest struct {
 	ExcludeUsers []uint `json:"exclude"`
 }
 
-func (Ctx *AppContext) Login(frame Frame) {
+func (Ctx *AppContext) Auth(frame Frame) {
 	var authData UserAuthData
 	frame.BindJSON(&authData)
 	Ctx.Logger.Debugf("AuthData: %v", authData)
@@ -51,7 +52,7 @@ func (Ctx *AppContext) Login(frame Frame) {
 
 	} else {
 		user.Email = authData.Email
-		user.Name = user.MakeNameFromEmail()
+		user.Name = common.StripTags(user.MakeNameFromEmail())
 		user.Roles = []Role{}
 		user.MakeSlug()
 		user.SetPassword(authData.Password)

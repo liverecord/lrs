@@ -3,6 +3,7 @@ package model
 import (
 	"encoding/json"
 	"time"
+
 )
 
 type Model struct {
@@ -10,6 +11,10 @@ type Model struct {
 	CreatedAt time.Time  `json:"createdAt"`
 	UpdatedAt time.Time  `json:"updatedAt"`
 	DeletedAt *time.Time `sql:"index" json:"deletedAt,omitempty"`
+}
+
+type Slugged struct {
+	Slug          string `sql:"index" json:"slug"`
 }
 
 func (m *Model) ToJSON() string {
