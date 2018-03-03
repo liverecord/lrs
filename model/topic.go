@@ -11,10 +11,10 @@ import (
 type Topic struct {
 	Model
 	Slugged
-	CategoryID    uint
-	Category      Category `gorm:"association_autoupdate:false;association_autocreate:false"`
-	UserID		  uint
-	User      	  User `gorm:"association_autoupdate:false;association_autocreate:false"`
+	CategoryID    uint `json:"categoryId"`
+	Category      Category `json:"category" gorm:"association_autoupdate:false;association_autocreate:false"`
+	UserID		  uint `json:"userId"`
+	User      	  User `json:"user" gorm:"association_autoupdate:false;association_autocreate:false"`
 	Title         string `json:"title"`
 	Body          string `json:"body"`
 	Order         int    `json:"order"`

@@ -12,13 +12,25 @@ import (
 )
 
 func (Ctx *AppContext) Topic(frame Frame) {
-	var topics []model.Topic
-	Ctx.Db.Preload("Category").Find(&topics)
-	ts, err := json.Marshal(topics[0])
-	if err == nil {
-		Ctx.Ws.WriteJSON(Frame{Type: TopicFrame, Data: string(ts)})
-	} else {
-		Ctx.Logger.WithError(err).Error()
+	var topic model.Topic
+
+	var data map[string]string
+	frame.BindJSON(&data)
+
+	if slug, ok := data["slug"]; ok {
+		Ctx.Db.
+			Preload("Category").
+			Preload("User").
+			Where("slug = ?", slug).First(&topic)
+		if topic.ID > 0 {
+			ts, err := json.Marshal(topic)
+			if err == nil {
+				Ctx.Ws.WriteJSON(Frame{Type: TopicFrame, Data: string(ts)})
+				Ctx.Db.Model(&topic).UpdateColumn("total_views", gorm.Expr("total_views + ?", 1))
+			} else {
+				Ctx.Logger.WithError(err).Error()
+			}
+		}
 	}
 }
 
