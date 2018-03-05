@@ -16,7 +16,7 @@ type Topic struct {
 	UserID		  uint `json:"userId"`
 	User      	  User `json:"user" gorm:"association_autoupdate:false;association_autocreate:false"`
 	Title         string `json:"title"`
-	Body          string `json:"body"`
+	Body          string `json:"body" sql:"type:longtext"`
 	Order         int    `json:"order"`
 	Acl           []User `json:"acl" gorm:"many2many:topic_acl;association_autoupdate:false;association_autocreate:false"`
 	TotalViews    uint32 `json:"total_views"`

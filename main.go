@@ -165,6 +165,8 @@ func main() {
 		Db.AutoMigrate(&Category{})
 		Db.AutoMigrate(&SocialProfile{})
 		Db.AutoMigrate(&Role{})
+		Db.AutoMigrate(&CommentStatus{})
+		Db.AutoMigrate(&Attachment{})
 
 		var configRecord ServerConfig
 		Db.First(&configRecord)
