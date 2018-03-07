@@ -4,3 +4,33 @@ go:
   - 1.9.x
   - 1.10.x
   - master
+
+
+install:
+  - make
+
+script:
+  - make VERSION="${TRAVIS_TAG:-latest}" dist
+
+deploy:
+  provider: releases
+  api_key: $GITHUB_ACCESS_TOKEN
+  overwrite: true
+  skip_cleanup: true
+  file_glob: true
+  file:
+    - dist/liverecord-server-alpine-linux-amd64-*.tar.gz
+    - dist/liverecord-server-linux-amd64-*.tar.gz
+    - dist/liverecord-server-linux-i386-*.tar.gz
+    - dist/liverecord-server-linux-armel-*.tar.gz
+    - dist/liverecord-server-linux-armhf-*.tar.gz
+    - dist/liverecord-server-darwin-amd64-*.tar.gz
+    - dist/liverecord-server-darwin-i386-*.tar.gz
+    - dist/liverecord-server-windows-amd64-*.zip
+    - dist/liverecord-server-windows-i386-*.zip
+  on:
+    tags: true
+
+notifications:
+  email:
+    on_success: never

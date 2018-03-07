@@ -1,4 +1,7 @@
 .idea
 .env
 server
-
+bin
+dist
+*.tar.gz
+*.zip
