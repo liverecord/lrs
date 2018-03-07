@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"reflect"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/jinzhu/gorm"
@@ -76,7 +75,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if len(jwt) > 0 {
-			lr.AuthorizeJWT(jwt)
+			handlers.AuthorizeJWT(&lr, jwt)
 		}
 
 		for {
@@ -92,23 +91,9 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 
-			logger.Debugf("Frame: %v", frame)
+			logger.Debugf("Frame: %+v", frame)
 			f, err := frameRouter.Process(&lr, frame)
-			// Here we keep default behaviour until
-			if err == router.ErrNotRegisteredFrameType {
-				// We use reflection to call methods
-				// Method name must match Frame.Type
-				lrv := reflect.ValueOf(&lr)
-				frv := reflect.ValueOf(frame)
-				method := lrv.MethodByName(frame.Type)
-				if method.IsValid() &&
-					method.Type().NumIn() == 1 &&
-					method.Type().In(0).AssignableTo(reflect.TypeOf(Frame{})) {
-					method.Call([]reflect.Value{frv})
-				} else {
-					lr.Logger.Errorf("method %s is invalid", frame.Type)
-				}
-			} else if err != nil {
+			if err != nil {
 				lr.Logger.WithError(err).Error()
 			} else if f.Type != "" {
 				lr.Ws.WriteJSON(f)
@@ -163,6 +148,11 @@ func main() {
 	frameRouter.AddHandler(TopicListFrame, handlers.TopicList)
 	frameRouter.AddHandler(TopicDeleteFrame, handlers.TopicDelete)
 	frameRouter.AddHandler(TopicSaveFrame, handlers.TopicSave)
+	frameRouter.AddHandler(UserInfoFrame, handlers.UserInfo)
+	frameRouter.AddHandler(UserUpdateFrame, handlers.UserUpdate)
+	frameRouter.AddHandler(UserListFrame, handlers.UserList)
+	frameRouter.AddHandler(UserDeleteFrame, handlers.UserDelete)
+	frameRouter.AddHandler(AuthFrame, handlers.Auth)
 
 	go handleBroadcastMessages()
 

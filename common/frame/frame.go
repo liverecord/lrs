@@ -6,6 +6,7 @@ const (
 	PingFrame           = "Ping"
 	AuthFrame           = "Auth"
 	AuthErrorFrame      = "AuthError"
+	LoginFrame          = "Login"
 	JWTFrame            = "JWT"
 	UserListFrame       = "UserList"
 	UserInfoFrame       = "UserInfo"
