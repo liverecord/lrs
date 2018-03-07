@@ -1,8 +1,9 @@
-# lrserver
-LiveRecord server app
+# LiveRecord Server 
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/liverecord/server)](https://goreportcard.com/report/github.com/liverecord/server)
 [![Build Status](https://travis-ci.org/liverecord/server.svg?branch=master)](https://travis-ci.org/liverecord/server)
+
+This is socket server for LiveRecord communication platform.
 
 ## Configure
 
@@ -15,8 +16,9 @@ DEBUG=true
 ```
 
 ## Assemble and run
-```
-go get
-go build
-./server
+
+Install make and execute:
+
+```bash
+make it work
 ```
