@@ -1,18 +1,23 @@
 # install dependencies and compile server
 
 default:
-	make build
+	make it
 
 clean:
 	rm ./server
 
 VERSION ?= latest
 
-.PHONY: build test dist
+.PHONY: build test dist it
 
 build:
+	go get
 	mkdir -p ./bin
 	go build -o ./bin/liverecord-server .
+
+it:
+	make build
+	if [ -f .env ]; then echo "Starting server!"; ./bin/liverecord-server ; else echo "Create .env file! Check manual on github!" ; fi ;
 
 test:
 	./test.sh
