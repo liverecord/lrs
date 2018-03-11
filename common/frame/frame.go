@@ -6,6 +6,7 @@ const (
 	PingFrame           = "Ping"
 	AuthFrame           = "Auth"
 	AuthErrorFrame      = "AuthError"
+	LoginFrame          = "Login"
 	JWTFrame            = "JWT"
 	UserListFrame       = "UserList"
 	UserInfoFrame       = "UserInfo"
@@ -18,8 +19,9 @@ const (
 	CategoryDeleteFrame = "CategoryDelete"
 	CategoryErrorFrame  = "CategoryError"
 	TopicFrame          = "Topic"
-	TopicUpdateFrame    = "TopicSave"
+	TopicSaveFrame      = "TopicSave"
 	TopicListFrame      = "TopicList"
+	TopicDeleteFrame    = "TopicDelete"
 	CommentFrame        = "Comment"
 	UserFrame           = "User"
 )

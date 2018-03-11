@@ -20,3 +20,7 @@ type AppContext struct {
 	User    *model.User
 	Clients *SocketClientsMap
 }
+
+func (Ctx *AppContext) IsAuthorized() bool {
+	return Ctx.User != nil && Ctx.User.ID > 0
+}

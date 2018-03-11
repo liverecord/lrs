@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"reflect"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/jinzhu/gorm"
@@ -15,16 +14,19 @@ import (
 	. "github.com/liverecord/server/common"
 	. "github.com/liverecord/server/common/common"
 	. "github.com/liverecord/server/common/frame"
-	. "github.com/liverecord/server/handlers"
-	. "github.com/liverecord/server/model"
+	"github.com/liverecord/server/handlers"
+	"github.com/liverecord/server/model"
 
 	"github.com/gorilla/websocket"
 	"github.com/joho/godotenv"
+	"github.com/liverecord/server/router"
 )
 
 var Db *gorm.DB
 var Cfg *ServerConfig
 var logger = logrus.New()
+
+var frameRouter = router.NewFrame()
 
 type Message struct {
 	Email   string `json:"email"`
@@ -33,11 +35,11 @@ type Message struct {
 
 type LrClient struct {
 	Conn *websocket.Conn
-	User *User
+	User *model.User
 }
 
-var clients = make(SocketClientsMap) // connected clients
-var broadcast = make(chan Message)   // broadcast channel
+var clients = make(handlers.SocketClientsMap) // connected clients
+var broadcast = make(chan Message)            // broadcast channel
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		return true
@@ -64,7 +66,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 		ws.WriteJSON(w)
 
 		// our registry
-		var lr = AppContext{
+		var lr = handlers.AppContext{
 			Db:      Db,
 			Cfg:     Cfg,
 			Logger:  logger,
@@ -73,7 +75,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if len(jwt) > 0 {
-			lr.AuthorizeJWT(jwt)
+			handlers.AuthorizeJWT(&lr, jwt)
 		}
 
 		for {
@@ -87,23 +89,15 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 				log.Print(err)
 				delete(clients, ws)
 				break
-			} else {
-				logger.Debugf("Frame: %v", frame)
-				// We use reflection to call methods
-				// Method name must match Frame.Type
-				lrv := reflect.ValueOf(&lr)
-				frv := reflect.ValueOf(frame)
-				method := lrv.MethodByName(frame.Type)
-				if method.IsValid() &&
-					method.Type().NumIn() == 1 &&
-					method.Type().In(0).AssignableTo(reflect.TypeOf(Frame{})) {
-					method.Call([]reflect.Value{frv})
-				} else {
-					lr.Logger.Errorf("method %s is invalid", frame.Type)
-				}
 			}
-			// Send the newly received message to the broadcast channel
-			// broadcast <- msg
+
+			logger.Debugf("Frame: %+v", frame)
+			f, err := frameRouter.Process(&lr, frame)
+			if err != nil {
+				lr.Logger.WithError(err).Error()
+			} else if f.Type != "" {
+				lr.Ws.WriteJSON(f)
+			}
 		}
 	}
 }
@@ -149,6 +143,17 @@ func main() {
 	http.HandleFunc("/api/oauth/", handleOauth)
 	http.HandleFunc("/api/oauth/facebook/", handleOauth)
 
+	frameRouter.AddHandler(CategoryListFrame, handlers.CategoryList)
+	frameRouter.AddHandler(TopicFrame, handlers.Topic)
+	frameRouter.AddHandler(TopicListFrame, handlers.TopicList)
+	frameRouter.AddHandler(TopicDeleteFrame, handlers.TopicDelete)
+	frameRouter.AddHandler(TopicSaveFrame, handlers.TopicSave)
+	frameRouter.AddHandler(UserInfoFrame, handlers.UserInfo)
+	frameRouter.AddHandler(UserUpdateFrame, handlers.UserUpdate)
+	frameRouter.AddHandler(UserListFrame, handlers.UserList)
+	frameRouter.AddHandler(UserDeleteFrame, handlers.UserDelete)
+	frameRouter.AddHandler(AuthFrame, handlers.Auth)
+
 	go handleBroadcastMessages()
 
 	if err == nil {
@@ -159,14 +164,14 @@ func main() {
 			logger.SetLevel(logrus.DebugLevel)
 		}
 		Db.AutoMigrate(&ServerConfig{})
-		Db.AutoMigrate(&User{})
-		Db.AutoMigrate(&Topic{})
-		Db.AutoMigrate(&Comment{})
-		Db.AutoMigrate(&Category{})
-		Db.AutoMigrate(&SocialProfile{})
-		Db.AutoMigrate(&Role{})
-		Db.AutoMigrate(&CommentStatus{})
-		Db.AutoMigrate(&Attachment{})
+		Db.AutoMigrate(&model.User{})
+		Db.AutoMigrate(&model.Topic{})
+		Db.AutoMigrate(&model.Comment{})
+		Db.AutoMigrate(&model.Category{})
+		Db.AutoMigrate(&model.SocialProfile{})
+		Db.AutoMigrate(&model.Role{})
+		Db.AutoMigrate(&model.CommentStatus{})
+		Db.AutoMigrate(&model.Attachment{})
 
 		var configRecord ServerConfig
 		Db.First(&configRecord)
