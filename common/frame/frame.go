@@ -13,6 +13,7 @@ const (
 	UserDeleteFrame     = "UserDelete"
 	CategoryFrame       = "Category"
 	CategoryListFrame   = "CategoryList"
+	CategorySaveFrame   = "CategorySave"
 	CategoryUpdateFrame = "CategoryUpdate"
 	CategoryDeleteFrame = "CategoryDelete"
 	CategoryErrorFrame  = "CategoryError"
