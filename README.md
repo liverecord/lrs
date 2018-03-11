@@ -17,7 +17,7 @@ DEBUG=true
 
 ## Assemble and run
 
-Install make and execute:
+Install [make](https://www.gnu.org/software/make/manual/make.html) and execute:
 
 ```bash
 make it work

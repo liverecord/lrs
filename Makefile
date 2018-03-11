@@ -1,12 +1,12 @@
 # install dependencies and compile server
 
+VERSION ?= latest
+
 default:
 	make it
 
 clean:
 	rm ./server
-
-VERSION ?= latest
 
 .PHONY: build test dist it
 
