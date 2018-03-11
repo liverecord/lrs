@@ -5,6 +5,6 @@ func S2BA(value string) []byte {
 }
 
 type ServerConfig struct {
-	ID           uint `gorm:"primary_key" json:"id"`
-	JwtSignature []byte
+	ID           uint   `gorm:"primary_key" json:"id"`
+	JwtSignature []byte `gorm:"type:varbinary(256)"`
 }
