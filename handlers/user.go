@@ -134,9 +134,7 @@ func (Ctx *AppContext) UserInfo(frame Frame) {
 	}
 }
 
-func (Ctx *AppContext) broadcast(frame Frame) {
 
-}
 
 func (Ctx *AppContext) IsAuthorized() bool {
 	return Ctx.User != nil && Ctx.User.ID > 0

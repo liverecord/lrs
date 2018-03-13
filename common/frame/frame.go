@@ -18,9 +18,11 @@ const (
 	CategoryDeleteFrame = "CategoryDelete"
 	CategoryErrorFrame  = "CategoryError"
 	TopicFrame          = "Topic"
-	TopicUpdateFrame    = "TopicSave"
+	TopicSaveFrame      = "TopicSave"
 	TopicListFrame      = "TopicList"
 	CommentFrame        = "Comment"
+	CommentListFrame    = "CommentList"
+	CommentSaveFrame    = "CommentSave"
 	UserFrame           = "User"
 )
 
@@ -32,4 +34,13 @@ type Frame struct {
 
 func (frame Frame) BindJSON(obj interface{}) error {
 	return json.Unmarshal([]byte(frame.Data), obj)
+}
+
+func NewFrame(t string, obj interface{}, requestId string) Frame {
+	r, _ := json.Marshal(obj)
+	return Frame{
+		Type: t,
+		Data: string(r),
+		RequestID: requestId,
+	}
 }

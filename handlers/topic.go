@@ -25,7 +25,9 @@ func (Ctx *AppContext) Topic(frame Frame) {
 		if topic.ID > 0 {
 			ts, err := json.Marshal(topic)
 			if err == nil {
-				Ctx.Ws.WriteJSON(Frame{Type: TopicFrame, Data: string(ts)})
+				topicFrame := Frame{Type: TopicFrame, Data: string(ts)}
+				Ctx.Ws.WriteJSON(topicFrame)
+				Ctx.CommentList(topicFrame)
 				Ctx.Db.Model(&topic).UpdateColumn("total_views", gorm.Expr("total_views + ?", 1))
 			} else {
 				Ctx.Logger.WithError(err).Error()
@@ -129,7 +131,7 @@ func (Ctx *AppContext) TopicSave(frame Frame) {
 				topic.User.ID = Ctx.User.ID
 				fmt.Println(frame.Data)
 				err = Ctx.Db.Set("gorm:association_autoupdate", false).Save(&topic).Error
-				Ctx.Ws.WriteJSON(Frame{Type: TopicUpdateFrame, Data: topic.ToJSON()})
+				Ctx.Ws.WriteJSON(Frame{Type: TopicSaveFrame, Data: topic.ToJSON()})
 			}
 			if err != nil {
 				Ctx.Logger.WithError(err).Error("Unable to save topic")

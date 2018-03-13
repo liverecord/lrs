@@ -12,6 +12,8 @@ type Comment struct {
 	Attachments []Attachment `json:"attachments" gorm:"association_autoupdate:false;association_autocreate:false"`
 	Rank        uint         `json:"rank"`
 	Solution    bool         `json:"solution"`
+	Spam    bool         `json:"spam"`
+	Moderated    bool         `json:"moderated"`
 }
 
 type Attachment struct {
