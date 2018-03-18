@@ -10,6 +10,7 @@ import (
 
 func (Ctx *AppContext) CommentList(frame Frame) {
 	var comments []model.Comment
+	comments = make([]model.Comment, 0, 1)
 	var topic model.Topic
 	err := frame.BindJSON(&topic)
 	if err != nil {
@@ -34,15 +35,15 @@ func (Ctx *AppContext) CommentList(frame Frame) {
 		Rows()
 
 	type CommentTopic struct {
-		topic_id   uint
-		topicSlug  string
-		topicTitle string
+		topic_id    uint
+		topic_slug  string
+		topic_title string
 	}
 
 	type CommentCategory struct {
-		categoryId uint
-		categorySlug string
-		categoryName string
+		category_id   uint
+		category_slug string
+		category_name string
 	}
 
 	// comments
@@ -59,23 +60,21 @@ func (Ctx *AppContext) CommentList(frame Frame) {
 
 			if err := Ctx.Db.ScanRows(rows, &commTopic); err == nil {
 				comm.Topic.ID = commTopic.topic_id
-				comm.Topic.Slug = commTopic.topicSlug
-				comm.Topic.Title = commTopic.topicTitle
+				comm.Topic.Slug = commTopic.topic_slug
+				comm.Topic.Title = commTopic.topic_title
 				Ctx.Logger.Debugln(commTopic)
 			}
 
 			if err := Ctx.Db.ScanRows(rows, &commCat); err == nil {
-				comm.Topic.Category.ID = commCat.categoryId
-				comm.Topic.Category.Slug = commCat.categorySlug
-				comm.Topic.Category.Name = commCat.categoryName
+				comm.Topic.Category.ID = commCat.category_id
+				comm.Topic.Category.Slug = commCat.category_slug
+				comm.Topic.Category.Name = commCat.category_name
 				Ctx.Logger.Debugln(commCat)
 			}
 
 			comments = append(comments, comm)
 		}
 		defer rows.Close()
-
-	Ctx.Logger.Debugf("%v", comments)
 		cats, _ := json.Marshal(comments)
 		Ctx.Ws.WriteJSON(Frame{Type: CommentListFrame, Data: string(cats)})
 	} else {
