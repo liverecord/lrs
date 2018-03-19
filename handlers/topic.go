@@ -55,7 +55,7 @@ func (Ctx *AppContext) TopicList(frame Frame) {
 		if len(searchTerm) > 1 {
 			query = query.
 				Where(
-				"title LIKE ? OR body LIKE ?",
+					"title LIKE ? OR body LIKE ?",
 					fmt.Sprint("%", searchTerm, "%"),
 					fmt.Sprint("%", searchTerm, "%"),
 				)
@@ -74,14 +74,14 @@ func (Ctx *AppContext) TopicList(frame Frame) {
 	if rp, ok := data["page"]; ok {
 		page, _ := strconv.Atoi(rp)
 		if page <= 0 {
-			page = 1;
+			page = 1
 		}
 	}
 
 	query.
 		Select("id,title,slug,created_at,updated_at,category_id").
 		Order("updated_at DESC,created_at DESC").
-		Offset((page-1) * 100).
+		Offset((page - 1) * 100).
 		Limit(100).
 		Find(&topics)
 	ts, err := json.Marshal(topics)
