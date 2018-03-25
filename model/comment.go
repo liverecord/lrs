@@ -5,11 +5,11 @@ import "time"
 type Comment struct {
 	Model
 	TopicID     uint         `json:"topicId" sql:"index"`
-	Topic       Topic        `json:"topic" gorm:"association_autoupdate:false;association_autocreate:false"`
+	Topic       Topic        `json:"topic,omitempty" gorm:"association_autoupdate:false;association_autocreate:false"`
 	UserID      uint         `json:"userId" sql:"index"`
 	User        User         `json:"user" gorm:"association_autoupdate:false;association_autocreate:false"`
 	Body        string       `json:"body" sql:"type:text"`
-	Attachments []Attachment `json:"attachments" gorm:"association_autoupdate:false;association_autocreate:false"`
+	Attachments []Attachment `json:"attachments,omitempty" gorm:"association_autoupdate:false;association_autocreate:false"`
 	Rank        uint         `json:"rank"`
 	Solution    bool         `json:"solution"`
 	Spam    bool         `json:"spam"`

@@ -37,7 +37,7 @@ type LrClient struct {
 }
 
 var clients = make(SocketClientsMap) // connected clients
-var broadcast = make(chan Message)   // broadcast channel
+var broadcast = make(chan Frame)     // broadcast channel
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		return true

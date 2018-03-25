@@ -20,12 +20,12 @@ type User struct {
 	Name     string          `json:"name"`
 	Slug     string          `json:"slug" gorm:"unique_index"`
 	Picture  string          `json:"picture"`
-	About    string          `json:"about"`
-	Gender   string          `json:"gender"`
+	About    string          `json:"about,omitempty"`
+	Gender   string          `json:"gender,omitempty"`
 	Rank     float32         `json:"rank"`
 	Online   bool            `json:"online"`
-	Roles    []Role          `json:"roles"`
-	Profiles []SocialProfile `json:"profiles" gorm:"[]"`
+	Roles    []Role          `json:"roles,omitempty"`
+	Profiles []SocialProfile `json:"profiles,omitempty" gorm:"[]"`
 }
 
 type SocialProfile struct {

@@ -12,16 +12,16 @@ type Topic struct {
 	Model
 	Slugged
 	CategoryID    uint `json:"categoryId"`
-	Category      Category `json:"category" gorm:"association_autoupdate:false;association_autocreate:false"`
+	Category      Category `json:"category,omitempty" gorm:"association_autoupdate:false;association_autocreate:false"`
 	UserID		  uint `json:"userId"`
-	User      	  User `json:"user" gorm:"association_autoupdate:false;association_autocreate:false"`
+	User      	  User `json:"user,omitempty" gorm:"association_autoupdate:false;association_autocreate:false"`
 	Title         string `json:"title"`
-	Body          string `json:"body" sql:"type:longtext"`
+	Body          string `json:"body,omitempty" sql:"type:longtext"`
 	Order         int    `json:"order"`
-	Acl           []User `json:"acl" gorm:"many2many:topic_acl;association_autoupdate:false;association_autocreate:false"`
-	TotalViews    uint32 `json:"total_views"`
-	TotalComments uint32 `json:"total_comments"`
-	Rank          uint32 `json:"rank"`
+	Acl           []User `json:"acl,omitempty" gorm:"many2many:topic_acl;association_autoupdate:false;association_autocreate:false"`
+	TotalViews    uint32 `json:"total_views,omitempty"`
+	TotalComments uint32 `json:"total_comments,omitempty"`
+	Rank          uint32 `json:"rank,omitempty"`
 }
 
 func makeUniqueSlug(s *string, db *gorm.DB, i uint)  {
