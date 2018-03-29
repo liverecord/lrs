@@ -11,6 +11,7 @@ import (
 )
 
 type SocketClientsMap map[*websocket.Conn]bool
+type SocketUsersMap map[*websocket.Conn]*model.User
 
 type AppContext struct {
 	Cfg     *common.ServerConfig

@@ -105,7 +105,9 @@ func (Ctx *AppContext) CommentList(frame Frame) {
 		Ctx.Logger.WithError(err)
 	}
 }
+func (Ctx *AppContext) BroadcastComment() {
 
+}
 func (Ctx *AppContext) CommentSave(frame Frame) {
 	if Ctx.IsAuthorized() {
 		var comment model.Comment
@@ -115,6 +117,19 @@ func (Ctx *AppContext) CommentSave(frame Frame) {
 		if err == nil {
 			comment.User.ID = Ctx.User.ID
 			comment.User = *Ctx.User
+
+			if comment.TopicID > 0 {
+				var topic model.Topic
+				Ctx.Db.First(&topic, comment.TopicID)
+				if topic.ID > 0 {
+					Ctx.Logger.Debugf("%v", topic.Acl)
+					if topic.Private {
+						// broadcast only to people from acl or author
+					} else {
+						// broadcast to everyone, who has any connection to this topic
+					}
+				}
+			}
 			if comment.ID > 0 {
 				Ctx.Logger.WithField("msg", "Comment updates not supported yet").Info()
 			} else {

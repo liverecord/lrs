@@ -22,6 +22,7 @@ type Topic struct {
 	TotalViews    uint32 `json:"total_views,omitempty"`
 	TotalComments uint32 `json:"total_comments,omitempty"`
 	Rank          uint32 `json:"rank,omitempty"`
+	Private       bool   `json:"private"`
 }
 
 func makeUniqueSlug(s *string, db *gorm.DB, i uint)  {

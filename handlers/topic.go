@@ -79,7 +79,8 @@ func (Ctx *AppContext) TopicList(frame Frame) {
 	}
 
 	query.
-		Select("id,title,slug,created_at,updated_at,category_id").
+		Preload("User").
+		//Select("id,title,slug,created_at,updated_at,category_id").
 		Order("updated_at DESC,created_at DESC").
 		Offset((page - 1) * 100).
 		Limit(100).
@@ -115,13 +116,14 @@ func (Ctx *AppContext) TopicSave(frame Frame) {
 		Ctx.Logger.Info("Decoded topic", topic)
 		Ctx.Logger.Info("User", Ctx.User)
 		if err == nil {
+			topic.Private = len(topic.Acl) > 0
 			if topic.ID > 0 {
 				// find topic in DB and update it
 				var oldTopic model.Topic
 				Ctx.Db.Where("id = ?", topic.ID).First(&oldTopic)
 				if oldTopic.ID > 0 {
 					oldTopic.Title = topic.Title
-					//oldTopic.Acl = topic.Acl
+					oldTopic.Acl = topic.Acl
 					oldTopic.Body = topic.Body
 					err = Ctx.Db.Set("gorm:association_autoupdate", false).Save(&oldTopic).Error
 				}
@@ -129,6 +131,7 @@ func (Ctx *AppContext) TopicSave(frame Frame) {
 				// this is new topic
 				topic.ID = 0
 				topic.User.ID = Ctx.User.ID
+				//topic.
 				fmt.Println(frame.Data)
 				err = Ctx.Db.Set("gorm:association_autoupdate", false).Save(&topic).Error
 				Ctx.Ws.WriteJSON(Frame{Type: TopicSaveFrame, Data: topic.ToJSON()})
@@ -137,7 +140,7 @@ func (Ctx *AppContext) TopicSave(frame Frame) {
 				Ctx.Logger.WithError(err).Error("Unable to save topic")
 			}
 		} else {
-			Ctx.Logger.WithError(err).Error("can't unmarshall topic")
+			Ctx.Logger.WithError(err).Error("Can't unmarshall topic")
 		}
 	} else {
 		Ctx.Logger.WithField("msg", "Unauthorized topic save call").Info()
