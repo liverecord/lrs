@@ -17,6 +17,7 @@ import (
 	. "github.com/liverecord/server/common/frame"
 	. "github.com/liverecord/server/handlers"
 	. "github.com/liverecord/server/model"
+	"github.com/zoonman/lizard-backend/models"
 
 	"github.com/gorilla/websocket"
 	"github.com/joho/godotenv"
@@ -31,10 +32,49 @@ type Message struct {
 	Message string `json:"password"`
 }
 
-type LrClient struct {
-	Conn *websocket.Conn
-	User *User
+//type SocketClientsMap map[*websocket.Conn]bool
+//type SocketUsersMap map[*websocket.Conn]*model.User
+
+type SocketConnectionsMap map[*websocket.Conn]*models.User
+type UserConnectionsMap map[*models.User]map[*websocket.Conn]bool
+
+
+type ConnectionPool struct {
+	Sockets SocketConnectionsMap
+	Users UserConnectionsMap
 }
+
+func NewConnectionPool() *ConnectionPool {
+	var pool ConnectionPool
+	pool.Sockets = make(SocketConnectionsMap)
+	pool.Users = make(UserConnectionsMap)
+	return &pool
+}
+
+func (pool *ConnectionPool) AddConnection(conn *websocket.Conn) {
+	pool.Sockets[conn] = nil
+}
+
+func (pool *ConnectionPool) Authenticate(conn *websocket.Conn, user *models.User) {
+	pool.Sockets[conn] = user
+	pool.Users[user][conn] = true
+}
+
+func (pool *ConnectionPool) Logout(user *models.User) {
+	for conn := range pool.Users[user] {
+		pool.Sockets[conn] = nil
+		delete(pool.Users[pool.Sockets[conn]], conn)
+	}
+}
+
+func (pool *ConnectionPool) DropConnection(conn *websocket.Conn) {
+	if pool.Sockets[conn] != nil {
+		delete(pool.Users[pool.Sockets[conn]], conn)
+	}
+	delete(pool.Sockets, conn)
+}
+
+
 
 var clients = make(SocketClientsMap) // connected clients
 var broadcast = make(chan Frame)     // broadcast channel
@@ -84,7 +124,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 
 			//log.Printf("read error: %v, message: %d bytes %s", err, messageType, p)
 			if err != nil {
-				log.Print(err)
+				logger.WithError(err).Errorln("Unable to read request")
 				delete(clients, ws)
 				break
 			} else {
