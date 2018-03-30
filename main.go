@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/rand"
-
 	"io"
 	"log"
 	"net/http"
@@ -10,17 +9,15 @@ import (
 	"reflect"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/gorilla/websocket"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
+	"github.com/joho/godotenv"
 	. "github.com/liverecord/server/common"
 	. "github.com/liverecord/server/common/common"
 	. "github.com/liverecord/server/common/frame"
 	. "github.com/liverecord/server/handlers"
 	. "github.com/liverecord/server/model"
-	"github.com/zoonman/lizard-backend/models"
-
-	"github.com/gorilla/websocket"
-	"github.com/joho/godotenv"
 )
 
 var Db *gorm.DB
@@ -32,16 +29,12 @@ type Message struct {
 	Message string `json:"password"`
 }
 
-//type SocketClientsMap map[*websocket.Conn]bool
-//type SocketUsersMap map[*websocket.Conn]*model.User
-
-type SocketConnectionsMap map[*websocket.Conn]*models.User
-type UserConnectionsMap map[*models.User]map[*websocket.Conn]bool
-
+type SocketConnectionsMap map[*websocket.Conn]*User
+type UserConnectionsMap map[*User]map[*websocket.Conn]bool
 
 type ConnectionPool struct {
 	Sockets SocketConnectionsMap
-	Users UserConnectionsMap
+	Users   UserConnectionsMap
 }
 
 func NewConnectionPool() *ConnectionPool {
@@ -55,12 +48,15 @@ func (pool *ConnectionPool) AddConnection(conn *websocket.Conn) {
 	pool.Sockets[conn] = nil
 }
 
-func (pool *ConnectionPool) Authenticate(conn *websocket.Conn, user *models.User) {
+func (pool *ConnectionPool) Authenticate(conn *websocket.Conn, user *User) {
 	pool.Sockets[conn] = user
+	if _, ok := pool.Users[user]; !ok {
+		pool.Users[user] = make(map[*websocket.Conn]bool)
+	}
 	pool.Users[user][conn] = true
 }
 
-func (pool *ConnectionPool) Logout(user *models.User) {
+func (pool *ConnectionPool) Logout(user *User) {
 	for conn := range pool.Users[user] {
 		pool.Sockets[conn] = nil
 		delete(pool.Users[pool.Sockets[conn]], conn)
@@ -74,8 +70,6 @@ func (pool *ConnectionPool) DropConnection(conn *websocket.Conn) {
 	delete(pool.Sockets, conn)
 }
 
-
-
 var clients = make(SocketClientsMap) // connected clients
 var broadcast = make(chan Frame)     // broadcast channel
 var upgrader = websocket.Upgrader{
@@ -83,6 +77,8 @@ var upgrader = websocket.Upgrader{
 		return true
 	},
 }
+
+var cpool = NewConnectionPool()
 
 func handleConnections(w http.ResponseWriter, r *http.Request) {
 
@@ -96,9 +92,11 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// Make sure we close the connection when the function returns
 		defer ws.Close()
+		defer cpool.DropConnection(ws)
 
 		// Register our new client
 		clients[ws] = true
+		cpool.AddConnection(ws)
 
 		w := map[string]interface{}{"type": 0, "connected": true}
 		ws.WriteJSON(w)
@@ -114,6 +112,9 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 
 		if len(jwt) > 0 {
 			lr.AuthorizeJWT(jwt)
+			if lr.IsAuthorized() {
+				cpool.Authenticate(ws, lr.User)
+			}
 		}
 
 		for {
@@ -126,6 +127,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				logger.WithError(err).Errorln("Unable to read request")
 				delete(clients, ws)
+				cpool.DropConnection(ws)
 				break
 			} else {
 				logger.Debugf("Frame: %v", frame)
