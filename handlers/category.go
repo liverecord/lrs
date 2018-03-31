@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"fmt"
 
 	. "github.com/liverecord/server"
@@ -10,12 +9,7 @@ import (
 func (Ctx *AppContext) CategoryList(frame Frame) {
 	var categories []Category
 	Ctx.Db.Find(&categories)
-	cats, err := json.Marshal(categories)
-	if err == nil {
-		Ctx.Ws.WriteJSON(Frame{Type: CategoryListFrame, Data: string(cats)})
-	} else {
-		Ctx.Logger.WithError(err)
-	}
+	Ctx.Ws.WriteJSON(NewFrame(CategoryListFrame, categories, ""))
 }
 
 func (Ctx *AppContext) CategorySave(frame Frame) {
@@ -31,7 +25,7 @@ func (Ctx *AppContext) CategorySave(frame Frame) {
 				category.ID = 0
 				fmt.Println(frame.Data)
 				err = Ctx.Db.Set("gorm:association_autoupdate", false).Save(&category).Error
-				Ctx.Ws.WriteJSON(Frame{Type: CategorySaveFrame, Data: category.ToJSON()})
+				Ctx.Ws.WriteJSON(NewFrame(CategorySaveFrame, category, ""))
 			}
 			if err != nil {
 				Ctx.Logger.WithError(err).Error("Unable to save category")

@@ -8,8 +8,8 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-type SocketClientsMap map[*websocket.Conn]bool
-type SocketUsersMap map[*websocket.Conn]*server.User
+//type SocketClientsMap map[*websocket.Conn]bool
+//type SocketUsersMap map[*websocket.Conn]*server.User
 
 type AppContext struct {
 	Cfg     *server.Config
@@ -17,6 +17,5 @@ type AppContext struct {
 	Logger  *logrus.Logger
 	Ws      *websocket.Conn
 	User    *server.User
-	Clients *SocketClientsMap
 	Pool 	*server.ConnectionPool
 }
