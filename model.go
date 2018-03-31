@@ -1,9 +1,8 @@
-package model
+package server
 
 import (
 	"encoding/json"
 	"time"
-
 )
 
 type Model struct {
@@ -14,7 +13,7 @@ type Model struct {
 }
 
 type Slugged struct {
-	Slug          string `sql:"index" json:"slug"`
+	Slug string `sql:"index" json:"slug"`
 }
 
 func (m *Model) ToJSON() string {

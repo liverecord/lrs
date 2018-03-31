@@ -8,11 +8,8 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/dgrijalva/jwt-go"
-	"github.com/liverecord/server/common"
-
-	. "github.com/liverecord/server/common/common"
-	. "github.com/liverecord/server/common/frame"
-	. "github.com/liverecord/server/model"
+	. "github.com/liverecord/server"
+	. "github.com/liverecord/server/common"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -52,7 +49,7 @@ func (Ctx *AppContext) Auth(frame Frame) {
 
 	} else {
 		user.Email = authData.Email
-		user.Name = common.StripTags(user.MakeNameFromEmail())
+		user.Name = StripTags(user.MakeNameFromEmail())
 		user.Roles = []Role{}
 		user.MakeSlug()
 		user.SetPassword(authData.Password)

@@ -1,4 +1,4 @@
-package frame
+package server
 
 import "encoding/json"
 
@@ -39,8 +39,8 @@ func (frame Frame) BindJSON(obj interface{}) error {
 func NewFrame(t string, obj interface{}, requestId string) Frame {
 	r, _ := json.Marshal(obj)
 	return Frame{
-		Type: t,
-		Data: string(r),
+		Type:      t,
+		Data:      string(r),
 		RequestID: requestId,
 	}
 }

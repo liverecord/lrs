@@ -2,14 +2,13 @@ package handlers
 
 import (
 	"encoding/json"
-
 	"fmt"
-	. "github.com/liverecord/server/common/frame"
-	"github.com/liverecord/server/model"
+
+	. "github.com/liverecord/server"
 )
 
 func (Ctx *AppContext) CategoryList(frame Frame) {
-	var categories []model.Category
+	var categories []Category
 	Ctx.Db.Find(&categories)
 	cats, err := json.Marshal(categories)
 	if err == nil {
@@ -21,7 +20,7 @@ func (Ctx *AppContext) CategoryList(frame Frame) {
 
 func (Ctx *AppContext) CategorySave(frame Frame) {
 	if Ctx.IsAuthorized() {
-		var category model.Category
+		var category Category
 		err := frame.BindJSON(&category)
 		Ctx.Logger.Info("Decoded category", category)
 		Ctx.Logger.Info("User", Ctx.User)

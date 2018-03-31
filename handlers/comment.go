@@ -4,14 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 
-	. "github.com/liverecord/server/common/frame"
-	"github.com/liverecord/server/model"
+	. "github.com/liverecord/server"
 )
 
 func (Ctx *AppContext) CommentList(frame Frame) {
-	var comments []model.Comment
-	comments = make([]model.Comment, 0, 1)
-	var topic model.Topic
+	var comments []Comment
+	comments = make([]Comment, 0, 1)
+	var topic Topic
 	err := frame.BindJSON(&topic)
 	if err != nil {
 		Ctx.Logger.WithError(err)
@@ -63,7 +62,7 @@ func (Ctx *AppContext) CommentList(frame Frame) {
 
 	if err == nil {
 		for rows.Next() {
-			var comm model.Comment
+			var comm Comment
 			var commTopic CommentTopic
 			var commCat CommentCategory
 			var commUser CommentUser
@@ -110,7 +109,7 @@ func (Ctx *AppContext) BroadcastComment() {
 }
 func (Ctx *AppContext) CommentSave(frame Frame) {
 	if Ctx.IsAuthorized() {
-		var comment model.Comment
+		var comment Comment
 		err := frame.BindJSON(&comment)
 		Ctx.Logger.Info("Decoded comment", comment)
 		Ctx.Logger.Info("User", Ctx.User)
@@ -119,14 +118,22 @@ func (Ctx *AppContext) CommentSave(frame Frame) {
 			comment.User = *Ctx.User
 
 			if comment.TopicID > 0 {
-				var topic model.Topic
+				var topic Topic
 				Ctx.Db.First(&topic, comment.TopicID)
 				if topic.ID > 0 {
 					Ctx.Logger.Debugf("%v", topic.Acl)
 					if topic.Private {
 						// broadcast only to people from acl or author
+						fr := NewFrame(CommentSaveFrame, comment, frame.RequestID)
+						Ctx.Pool.Send(&topic.User, fr)
+						for u := range topic.Acl {
+							Ctx.Pool.Send(&topic.Acl[u], fr)
+						}
+
 					} else {
 						// broadcast to everyone, who has any connection to this topic
+						// find everyone, who viewed or commented this topic
+
 					}
 				}
 			}
@@ -136,17 +143,8 @@ func (Ctx *AppContext) CommentSave(frame Frame) {
 				comment.ID = 0
 				fmt.Println(frame.Data)
 				err = Ctx.Db.Set("gorm:association_autoupdate", false).Save(&comment).Error
-				//Ctx.Ws.WriteJSON()
-
-				savedFrame := NewFrame(CommentSaveFrame, comment, frame.RequestID)
-
-				for client := range *Ctx.Clients {
-					err := client.WriteJSON(savedFrame)
-					if err != nil {
-						Ctx.Logger.WithError(err).Error("Unable to broadcast comment")
-						client.Close()
-						delete(*Ctx.Clients, client)
-					}
+				if err == nil {
+					Ctx.Pool.Broadcast(NewFrame(CommentSaveFrame, comment, frame.RequestID))
 				}
 			}
 			if err != nil {

@@ -1,4 +1,4 @@
-package model
+package server
 
 type Category struct {
 	Model
@@ -6,6 +6,6 @@ type Category struct {
 	Slug        string `sql:"index" json:"slug"`
 	Description string `json:"description" sql:"type:text"`
 	Order       int    `json:"order"`
-	Active      bool   `json:"order"`
-	Updates     int    `json:"order"`
+	Active      bool   `json:"active"`
+	Updates     int    `json:"updates"`
 }

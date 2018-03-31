@@ -1,10 +1,6 @@
-package common
+package server
 
-func S2BA(value string) []byte {
-	return []byte(value)
-}
-
-type ServerConfig struct {
+type Config struct {
 	ID           uint   `gorm:"primary_key" json:"id"`
 	JwtSignature []byte `gorm:"type:varbinary(256)"`
 }

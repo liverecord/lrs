@@ -7,12 +7,11 @@ import (
 
 	"github.com/jinzhu/gorm"
 
-	. "github.com/liverecord/server/common/frame"
-	"github.com/liverecord/server/model"
+	"github.com/liverecord/server"
 )
 
-func (Ctx *AppContext) Topic(frame Frame) {
-	var topic model.Topic
+func (Ctx *AppContext) Topic(frame server.Frame) {
+	var topic server.Topic
 
 	var data map[string]string
 	frame.BindJSON(&data)
@@ -25,7 +24,7 @@ func (Ctx *AppContext) Topic(frame Frame) {
 		if topic.ID > 0 {
 			ts, err := json.Marshal(topic)
 			if err == nil {
-				topicFrame := Frame{Type: TopicFrame, Data: string(ts)}
+				topicFrame := server.Frame{Type: server.TopicFrame, Data: string(ts)}
 				Ctx.Ws.WriteJSON(topicFrame)
 				Ctx.CommentList(topicFrame)
 				Ctx.Db.Model(&topic).UpdateColumn("total_views", gorm.Expr("total_views + ?", 1))
@@ -36,9 +35,9 @@ func (Ctx *AppContext) Topic(frame Frame) {
 	}
 }
 
-func (Ctx *AppContext) TopicList(frame Frame) {
-	var topics []model.Topic
-	var category model.Category
+func (Ctx *AppContext) TopicList(frame server.Frame) {
+	var topics []server.Topic
+	var category server.Category
 	var data map[string]string
 	page := 0
 	frame.BindJSON(&data)
@@ -87,19 +86,19 @@ func (Ctx *AppContext) TopicList(frame Frame) {
 		Find(&topics)
 	ts, err := json.Marshal(topics)
 	if err == nil {
-		Ctx.Ws.WriteJSON(Frame{Type: TopicListFrame, Data: string(ts)})
+		Ctx.Ws.WriteJSON(server.Frame{Type: server.TopicListFrame, Data: string(ts)})
 	} else {
 		Ctx.Logger.WithError(err).Error()
 	}
 }
 
-func (Ctx *AppContext) TopicDelete(frame Frame) {
+func (Ctx *AppContext) TopicDelete(frame server.Frame) {
 	if Ctx.IsAuthorized() {
-		var topic model.Topic
+		var topic server.Topic
 		err := frame.BindJSON(&topic)
 		if err == nil {
 			if topic.ID > 0 {
-				var found model.Topic
+				var found server.Topic
 				Ctx.Db.First(&found, topic.ID)
 				if found.ID > 0 && found.User.ID == Ctx.User.ID {
 					Ctx.Db.Delete(found)
@@ -109,9 +108,9 @@ func (Ctx *AppContext) TopicDelete(frame Frame) {
 	}
 }
 
-func (Ctx *AppContext) TopicSave(frame Frame) {
+func (Ctx *AppContext) TopicSave(frame server.Frame) {
 	if Ctx.IsAuthorized() {
-		var topic model.Topic
+		var topic server.Topic
 		err := frame.BindJSON(&topic)
 		Ctx.Logger.Info("Decoded topic", topic)
 		Ctx.Logger.Info("User", Ctx.User)
@@ -119,7 +118,7 @@ func (Ctx *AppContext) TopicSave(frame Frame) {
 			topic.Private = len(topic.Acl) > 0
 			if topic.ID > 0 {
 				// find topic in DB and update it
-				var oldTopic model.Topic
+				var oldTopic server.Topic
 				Ctx.Db.Where("id = ?", topic.ID).First(&oldTopic)
 				if oldTopic.ID > 0 {
 					oldTopic.Title = topic.Title
@@ -134,7 +133,7 @@ func (Ctx *AppContext) TopicSave(frame Frame) {
 				//topic.
 				fmt.Println(frame.Data)
 				err = Ctx.Db.Set("gorm:association_autoupdate", false).Save(&topic).Error
-				Ctx.Ws.WriteJSON(Frame{Type: TopicSaveFrame, Data: topic.ToJSON()})
+				Ctx.Ws.WriteJSON(server.Frame{Type: server.TopicSaveFrame, Data: topic.ToJSON()})
 			}
 			if err != nil {
 				Ctx.Logger.WithError(err).Error("Unable to save topic")

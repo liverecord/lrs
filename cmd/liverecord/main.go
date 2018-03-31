@@ -13,15 +13,13 @@ import (
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
 	"github.com/joho/godotenv"
-	. "github.com/liverecord/server/common"
-	. "github.com/liverecord/server/common/common"
-	. "github.com/liverecord/server/common/frame"
-	. "github.com/liverecord/server/handlers"
-	. "github.com/liverecord/server/model"
+	"github.com/liverecord/server"
+	"github.com/liverecord/server/common"
+	"github.com/liverecord/server/handlers"
 )
 
 var Db *gorm.DB
-var Cfg *ServerConfig
+var Cfg *server.Config
 var logger = logrus.New()
 
 type Message struct {
@@ -29,56 +27,16 @@ type Message struct {
 	Message string `json:"password"`
 }
 
-type SocketConnectionsMap map[*websocket.Conn]*User
-type UserConnectionsMap map[*User]map[*websocket.Conn]bool
 
-type ConnectionPool struct {
-	Sockets SocketConnectionsMap
-	Users   UserConnectionsMap
-}
-
-func NewConnectionPool() *ConnectionPool {
-	var pool ConnectionPool
-	pool.Sockets = make(SocketConnectionsMap)
-	pool.Users = make(UserConnectionsMap)
-	return &pool
-}
-
-func (pool *ConnectionPool) AddConnection(conn *websocket.Conn) {
-	pool.Sockets[conn] = nil
-}
-
-func (pool *ConnectionPool) Authenticate(conn *websocket.Conn, user *User) {
-	pool.Sockets[conn] = user
-	if _, ok := pool.Users[user]; !ok {
-		pool.Users[user] = make(map[*websocket.Conn]bool)
-	}
-	pool.Users[user][conn] = true
-}
-
-func (pool *ConnectionPool) Logout(user *User) {
-	for conn := range pool.Users[user] {
-		pool.Sockets[conn] = nil
-		delete(pool.Users[pool.Sockets[conn]], conn)
-	}
-}
-
-func (pool *ConnectionPool) DropConnection(conn *websocket.Conn) {
-	if pool.Sockets[conn] != nil {
-		delete(pool.Users[pool.Sockets[conn]], conn)
-	}
-	delete(pool.Sockets, conn)
-}
-
-var clients = make(SocketClientsMap) // connected clients
-var broadcast = make(chan Frame)     // broadcast channel
+var clients = make(handlers.SocketClientsMap) // connected clients
+var broadcast = make(chan server.Frame)     // broadcast channel
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		return true
 	},
 }
 
-var cpool = NewConnectionPool()
+var pool = server.NewConnectionPool()
 
 func handleConnections(w http.ResponseWriter, r *http.Request) {
 
@@ -92,56 +50,57 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// Make sure we close the connection when the function returns
 		defer ws.Close()
-		defer cpool.DropConnection(ws)
+		defer pool.DropConnection(ws)
 
 		// Register our new client
-		clients[ws] = true
-		cpool.AddConnection(ws)
+		// clients[ws] = true
+		pool.AddConnection(ws)
 
 		w := map[string]interface{}{"type": 0, "connected": true}
 		ws.WriteJSON(w)
 
 		// our registry
-		var lr = AppContext{
+		var lr = handlers.AppContext{
 			Db:      Db,
 			Cfg:     Cfg,
 			Logger:  logger,
 			Ws:      ws,
 			Clients: &clients,
+			Pool:    pool,
 		}
 
 		if len(jwt) > 0 {
 			lr.AuthorizeJWT(jwt)
 			if lr.IsAuthorized() {
-				cpool.Authenticate(ws, lr.User)
+				pool.Authenticate(ws, lr.User)
 			}
 		}
 
 		for {
 			// var msg Message
-			var frame Frame
+			var f server.Frame
 			// Read in a new message as JSON and map it to a Frame object
-			err := ws.ReadJSON(&frame)
+			err := ws.ReadJSON(&f)
 
 			//log.Printf("read error: %v, message: %d bytes %s", err, messageType, p)
 			if err != nil {
 				logger.WithError(err).Errorln("Unable to read request")
 				delete(clients, ws)
-				cpool.DropConnection(ws)
+				pool.DropConnection(ws)
 				break
 			} else {
-				logger.Debugf("Frame: %v", frame)
+				logger.Debugf("Frame: %v", f)
 				// We use reflection to call methods
 				// Method name must match Frame.Type
 				lrv := reflect.ValueOf(&lr)
-				frv := reflect.ValueOf(frame)
-				method := lrv.MethodByName(frame.Type)
+				frv := reflect.ValueOf(f)
+				method := lrv.MethodByName(f.Type)
 				if method.IsValid() &&
 					method.Type().NumIn() == 1 &&
-					method.Type().In(0).AssignableTo(reflect.TypeOf(Frame{})) {
+					method.Type().In(0).AssignableTo(reflect.TypeOf(server.Frame{})) {
 					method.Call([]reflect.Value{frv})
 				} else {
-					lr.Logger.Errorf("method %s is invalid", frame.Type)
+					lr.Logger.Errorf("method %s is invalid", f.Type)
 				}
 			}
 			// Send the newly received message to the broadcast channel
@@ -183,10 +142,10 @@ func main() {
 	// open db connection
 	Db, err = gorm.Open(
 		"mysql",
-		Env("MYSQL_DSN", "root:123@tcp(127.0.0.1:3306)/liveRecord?charset=utf8&parseTime=True"))
+		common.Env("MYSQL_DSN", "root:123@tcp(127.0.0.1:3306)/liveRecord?charset=utf8&parseTime=True"))
 
 	// configure web-server
-	fs := http.FileServer(http.Dir(Env("DOCUMENT_ROOT", "public")))
+	fs := http.FileServer(http.Dir(common.Env("DOCUMENT_ROOT", "public")))
 	http.Handle("/", fs)
 	http.HandleFunc("/ws", handleConnections)
 	http.HandleFunc("/api/oauth/", handleOauth)
@@ -196,22 +155,22 @@ func main() {
 
 	if err == nil {
 		defer Db.Close()
-		if BoolEnv("DEBUG", false) {
+		if common.BoolEnv("DEBUG", false) {
 			Db.LogMode(true)
 			Db.Debug()
 			logger.SetLevel(logrus.DebugLevel)
 		}
-		Db.AutoMigrate(&ServerConfig{})
-		Db.AutoMigrate(&User{})
-		Db.AutoMigrate(&Topic{})
-		Db.AutoMigrate(&Comment{})
-		Db.AutoMigrate(&Category{})
-		Db.AutoMigrate(&SocialProfile{})
-		Db.AutoMigrate(&Role{})
-		Db.AutoMigrate(&CommentStatus{})
-		Db.AutoMigrate(&Attachment{})
+		Db.AutoMigrate(&server.Config{})
+		Db.AutoMigrate(&server.User{})
+		Db.AutoMigrate(&server.Topic{})
+		Db.AutoMigrate(&server.Comment{})
+		Db.AutoMigrate(&server.Category{})
+		Db.AutoMigrate(&server.SocialProfile{})
+		Db.AutoMigrate(&server.Role{})
+		Db.AutoMigrate(&server.CommentStatus{})
+		Db.AutoMigrate(&server.Attachment{})
 
-		var configRecord ServerConfig
+		var configRecord server.Config
 		Db.First(&configRecord)
 
 		if configRecord.ID == 0 {
@@ -223,7 +182,7 @@ func main() {
 
 		Cfg = &configRecord
 
-		addr := Env("LISTEN_ADDR", "127.0.0.1:8000")
+		addr := common.Env("LISTEN_ADDR", "127.0.0.1:8000")
 		logger.Printf("Listening on %s", addr)
 		err := http.ListenAndServe(addr, nil)
 		if err != nil {

@@ -2,11 +2,14 @@ package common
 
 import (
 	"os"
-
 	"strconv"
 
 	"github.com/microcosm-cc/bluemonday"
 )
+
+func S2BA(value string) []byte {
+	return []byte(value)
+}
 
 func Env(key, def string) string {
 	val, set := os.LookupEnv(key)

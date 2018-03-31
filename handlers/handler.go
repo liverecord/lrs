@@ -3,21 +3,20 @@ package handlers
 import (
 	"github.com/Sirupsen/logrus"
 	"github.com/jinzhu/gorm"
-	"github.com/liverecord/server/model"
+	"github.com/liverecord/server"
 
 	"github.com/gorilla/websocket"
-
-	"github.com/liverecord/server/common/common"
 )
 
 type SocketClientsMap map[*websocket.Conn]bool
-type SocketUsersMap map[*websocket.Conn]*model.User
+type SocketUsersMap map[*websocket.Conn]*server.User
 
 type AppContext struct {
-	Cfg     *common.ServerConfig
+	Cfg     *server.Config
 	Db      *gorm.DB
 	Logger  *logrus.Logger
 	Ws      *websocket.Conn
-	User    *model.User
+	User    *server.User
 	Clients *SocketClientsMap
+	Pool 	*server.ConnectionPool
 }
