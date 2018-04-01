@@ -26,6 +26,18 @@ type User struct {
 	Online   bool            `json:"online"`
 	Roles    []Role          `json:"roles,omitempty"`
 	Profiles []SocialProfile `json:"profiles,omitempty" gorm:"[]"`
+	Settings Settings
+}
+
+type Settings struct {
+	// Offline Notifications:
+	// 0. No
+	// 1. Push only
+	// 2. Immediate to email
+	// 3. Daily email digests
+	// 4. Weekly email digests
+	Notifications uint
+	Timezone	time.Location
 }
 
 type SocialProfile struct {
@@ -86,3 +98,5 @@ func (u *User) MakeSlug() {
 func (u *User) MakeGravatarPicture() string {
 	return gravatar.Avatar(u.Email, 100)
 }
+
+
