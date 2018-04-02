@@ -37,7 +37,7 @@ type Settings struct {
 	// 3. Daily email digests
 	// 4. Weekly email digests
 	Notifications uint
-	Timezone	time.Location
+	Timezone      time.Location
 }
 
 type SocialProfile struct {
@@ -98,5 +98,3 @@ func (u *User) MakeSlug() {
 func (u *User) MakeGravatarPicture() string {
 	return gravatar.Avatar(u.Email, 100)
 }
-
-

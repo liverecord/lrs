@@ -19,7 +19,12 @@ import (
 
 var Db *gorm.DB
 var Cfg *server.Config
-var logger = logrus.New()
+var logger *logrus.Logger
+
+func init()  {
+ 	logger = logrus.New()
+ 	logger.Formatter = &logrus.TextFormatter{ForceColors:true}
+}
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
@@ -99,6 +104,8 @@ func main() {
 	err = godotenv.Load()
 
 	logger.Out = os.Stdout
+
+
 
 	if err != nil {
 		logger.Fatal("Error loading .env file")
