@@ -4,8 +4,9 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+type SocketStateMap map[*websocket.Conn]bool
 type SocketConnectionsMap map[*websocket.Conn]*User
-type UserConnectionsMap map[uint]map[*websocket.Conn]bool
+type UserConnectionsMap map[uint]SocketStateMap
 
 type ConnectionPool struct {
 	Sockets SocketConnectionsMap
@@ -26,7 +27,7 @@ func (pool *ConnectionPool) AddConnection(conn *websocket.Conn) {
 func (pool *ConnectionPool) Authenticate(conn *websocket.Conn, user *User) {
 	pool.Sockets[conn] = user
 	if _, ok := pool.Users[user.ID]; !ok {
-		pool.Users[user.ID] = make(map[*websocket.Conn]bool)
+		pool.Users[user.ID] = make(SocketStateMap)
 	}
 	pool.Users[user.ID][conn] = true
 }
@@ -43,6 +44,7 @@ func (pool *ConnectionPool) DropConnection(conn *websocket.Conn) {
 		delete(pool.Users[pool.Sockets[conn].ID], conn)
 	}
 	delete(pool.Sockets, conn)
+	conn.Close()
 }
 
 func (pool *ConnectionPool) Broadcast(frame Frame) {
@@ -63,4 +65,8 @@ func (pool *ConnectionPool) Send(to *User, frame Frame) {
 			}
 		}
 	}
+}
+
+func (pool *ConnectionPool) Ping() {
+
 }

@@ -2,6 +2,7 @@ package server
 
 import (
 	"crypto/rand"
+	"net"
 	"strings"
 	"time"
 
@@ -26,7 +27,27 @@ type User struct {
 	Online   bool            `json:"online"`
 	Roles    []Role          `json:"roles,omitempty"`
 	Profiles []SocialProfile `json:"profiles,omitempty" gorm:"[]"`
+	Devices  []Devices
 	Settings Settings
+
+	// Status?
+
+	// Available
+	// Busy
+	// Offline
+}
+
+type Devices struct {
+	UserID       uint
+	DeviceID     string
+	Type         string // browser, phone
+	UserAgent    string
+	LastIp       net.Addr
+	AccessAt     time.Time
+	Subscribed   bool
+	PushEndpoint string
+	PushKeyP256  string
+	PushAuth     string
 }
 
 type Settings struct {
@@ -36,6 +57,7 @@ type Settings struct {
 	// 2. Immediate to email
 	// 3. Daily email digests
 	// 4. Weekly email digests
+	UserID        uint
 	Notifications uint
 	Timezone      time.Location
 }

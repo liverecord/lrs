@@ -84,12 +84,7 @@ func (Ctx *AppContext) TopicList(frame server.Frame) {
 		Offset((page - 1) * 100).
 		Limit(100).
 		Find(&topics)
-	ts, err := json.Marshal(topics)
-	if err == nil {
-		Ctx.Ws.WriteJSON(server.Frame{Type: server.TopicListFrame, Data: string(ts)})
-	} else {
-		Ctx.Logger.WithError(err).Error()
-	}
+	Ctx.Ws.WriteJSON(server.NewFrame(server.TopicListFrame, topics, ""))
 }
 
 func (Ctx *AppContext) TopicDelete(frame server.Frame) {
@@ -125,6 +120,12 @@ func (Ctx *AppContext) TopicSave(frame server.Frame) {
 					oldTopic.Acl = topic.Acl
 					oldTopic.Body = topic.Body
 					err = Ctx.Db.Set("gorm:association_autoupdate", false).Save(&oldTopic).Error
+
+					Ctx.Ws.WriteJSON(server.NewFrame(server.TopicSaveFrame, topic, frame.RequestID))
+					if topic.Private == false {
+						Ctx.Pool.Broadcast(server.NewFrame(server.TopicSaveFrame, topic, ""))
+					}
+
 				}
 			} else {
 				// this is new topic
@@ -133,7 +134,11 @@ func (Ctx *AppContext) TopicSave(frame server.Frame) {
 				//topic.
 				fmt.Println(frame.Data)
 				err = Ctx.Db.Set("gorm:association_autoupdate", false).Save(&topic).Error
-				Ctx.Ws.WriteJSON(server.Frame{Type: server.TopicSaveFrame, Data: topic.ToJSON()})
+
+				Ctx.Ws.WriteJSON(server.NewFrame(server.TopicSaveFrame, topic, frame.RequestID))
+				if topic.Private == false {
+					Ctx.Pool.Broadcast(server.NewFrame(server.TopicSaveFrame, topic, ""))
+				}
 			}
 			if err != nil {
 				Ctx.Logger.WithError(err).Error("Unable to save topic")
