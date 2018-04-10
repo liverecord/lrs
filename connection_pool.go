@@ -11,17 +11,21 @@ type UserConnectionsMap map[uint]SocketStateMap
 type ConnectionPool struct {
 	Sockets SocketConnectionsMap
 	Users   UserConnectionsMap
+	outbox  map[*websocket.Conn]chan *Frame
 }
 
 func NewConnectionPool() *ConnectionPool {
 	var pool ConnectionPool
 	pool.Sockets = make(SocketConnectionsMap)
 	pool.Users = make(UserConnectionsMap)
+	pool.outbox = make(map[*websocket.Conn]chan *Frame)
 	return &pool
 }
 
 func (pool *ConnectionPool) AddConnection(conn *websocket.Conn) {
 	pool.Sockets[conn] = nil
+	pool.outbox[conn] = make(chan *Frame)
+	go pool.dispatch(conn)
 }
 
 func (pool *ConnectionPool) Authenticate(conn *websocket.Conn, user *User) {
@@ -43,30 +47,38 @@ func (pool *ConnectionPool) DropConnection(conn *websocket.Conn) {
 	if pool.Sockets[conn] != nil {
 		delete(pool.Users[pool.Sockets[conn].ID], conn)
 	}
+	close(pool.outbox[conn])
+	delete(pool.outbox, conn)
 	delete(pool.Sockets, conn)
 	conn.Close()
 }
 
 func (pool *ConnectionPool) Broadcast(frame Frame) {
 	for conn := range pool.Sockets {
-		err := conn.WriteJSON(frame)
-		if err != nil {
-			pool.DropConnection(conn)
-		}
+		pool.Write(conn, &frame)
+	}
+}
+
+func (pool *ConnectionPool) Write(conn *websocket.Conn, frame *Frame) {
+	if _, ok := pool.outbox[conn]; ok {
+		pool.outbox[conn] <- frame
 	}
 }
 
 func (pool *ConnectionPool) Send(to *User, frame Frame) {
 	if _, ok := pool.Users[to.ID]; ok {
 		for conn := range pool.Users[to.ID] {
-			err := conn.WriteJSON(frame)
-			if err != nil {
-				pool.DropConnection(conn)
-			}
+			pool.Write(conn, &frame)
 		}
 	}
 }
 
-func (pool *ConnectionPool) Ping() {
-
+func (pool *ConnectionPool) dispatch(c *websocket.Conn) {
+	for {
+		f, _ := <-pool.outbox[c]
+		err := c.WriteJSON(&f)
+		if err != nil {
+			pool.DropConnection(c)
+		}
+	}
 }

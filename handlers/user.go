@@ -43,7 +43,7 @@ func (Ctx *AppContext) Auth(frame Frame) {
 			Ctx.respondWithToken(user)
 			Ctx.User = &user
 		} else {
-			Ctx.Ws.WriteJSON(Frame{Type: AuthErrorFrame, Data: "PasswordMismatch"})
+			Ctx.Pool.Write(Ctx.Ws, &Frame{Type: AuthErrorFrame, Data: "PasswordMismatch"})
 			Ctx.Logger.WithError(err).Errorf("Cannot authorize user %s %v", user.Email, err)
 		}
 
@@ -65,7 +65,7 @@ func (Ctx *AppContext) respondWithToken(user User) {
 	if err == nil {
 		userData, err := json.Marshal(uld)
 		if err == nil {
-			Ctx.Ws.WriteJSON(Frame{Type: AuthFrame, Data: string(userData)})
+			Ctx.Pool.Write(Ctx.Ws, &Frame{Type: AuthFrame, Data: string(userData)})
 		} else {
 			Ctx.Logger.WithError(err).Error("Cannot marshall user data")
 		}
