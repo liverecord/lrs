@@ -43,6 +43,7 @@ func SanitizeHtml(html string) string {
 	p := bluemonday.NewPolicy()
 	p.AllowImages()
 	p.AllowLists()
+	p.AllowTables()
 	p.AllowAttrs("cite").OnElements("blockquote")
 	p.AllowElements("br", "hr", "p", "span", "code", "kbd", "sub", "sup", "b", "i", "u", "strong", "em")
 

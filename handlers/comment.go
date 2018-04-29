@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"fmt"
 
 	. "github.com/liverecord/server"
@@ -39,10 +38,10 @@ func (Ctx *AppContext) CommentList(frame Frame) {
 		Rows()
 
 	type CommentUser struct {
-		UserSlug string
-		UserName string
-		UserRank float32
-		UserOnline bool
+		UserSlug    string
+		UserName    string
+		UserRank    float32
+		UserOnline  bool
 		UserPicture string
 	}
 
@@ -98,8 +97,11 @@ func (Ctx *AppContext) CommentList(frame Frame) {
 			comments = append(comments, comm)
 		}
 		defer rows.Close()
-		cats, _ := json.Marshal(comments)
-		Ctx.Ws.WriteJSON(Frame{Type: CommentListFrame, Data: string(cats)})
+		// cats, _ := json.Marshal(comments)
+		// Ctx.Ws.WriteJSON(Frame{Type: CommentListFrame, Data: string(cats)})
+
+		Ctx.Pool.Write(Ctx.Ws, NewFrame(CommentListFrame, comments, frame.RequestID))
+
 	} else {
 		Ctx.Logger.WithError(err)
 	}

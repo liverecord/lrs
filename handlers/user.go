@@ -43,7 +43,7 @@ func (Ctx *AppContext) Auth(frame Frame) {
 			Ctx.respondWithToken(user)
 			Ctx.User = &user
 		} else {
-			Ctx.Pool.Write(Ctx.Ws, &Frame{Type: AuthErrorFrame, Data: "PasswordMismatch"})
+			Ctx.Pool.Write(Ctx.Ws, Frame{Type: AuthErrorFrame, Data: "PasswordMismatch"})
 			Ctx.Logger.WithError(err).Errorf("Cannot authorize user %s %v", user.Email, err)
 		}
 
@@ -63,12 +63,7 @@ func (Ctx *AppContext) Auth(frame Frame) {
 func (Ctx *AppContext) respondWithToken(user User) {
 	uld, err := Ctx.generateToken(user)
 	if err == nil {
-		userData, err := json.Marshal(uld)
-		if err == nil {
-			Ctx.Pool.Write(Ctx.Ws, &Frame{Type: AuthFrame, Data: string(userData)})
-		} else {
-			Ctx.Logger.WithError(err).Error("Cannot marshall user data")
-		}
+		Ctx.Pool.Write(Ctx.Ws, NewFrame(AuthFrame, uld, ""))
 	} else {
 		Ctx.Logger.WithError(err).Printf("Cannot generate token %v", err)
 	}
@@ -122,16 +117,9 @@ func (Ctx *AppContext) UserInfo(frame Frame) {
 	frame.BindJSON(&request)
 	Ctx.Db.Where("id = ? OR slug = ?", request.Slug, request.Slug).First(&user)
 	if user.ID > 0 {
-		userData, err := json.Marshal(user)
-		if err == nil {
-			Ctx.Ws.WriteJSON(Frame{Type: UserInfoFrame, Data: string(userData)})
-		} else {
-			Ctx.Logger.WithError(err)
-		}
+		Ctx.Pool.Write(Ctx.Ws, NewFrame(UserInfoFrame, user, frame.RequestID))
 	}
 }
-
-
 
 func (Ctx *AppContext) IsAuthorized() bool {
 	return Ctx.User != nil && Ctx.User.ID > 0
@@ -170,7 +158,7 @@ func (Ctx *AppContext) UserList(frame Frame) {
 	if users != nil {
 		userData, err := json.Marshal(users)
 		if err == nil {
-			Ctx.Ws.WriteJSON(Frame{Type: UserListFrame, Data: string(userData)})
+			Ctx.Pool.Write(Ctx.Ws, Frame{Type: UserListFrame, Data: string(userData)})
 		} else {
 			Ctx.Logger.WithError(err)
 		}
@@ -180,5 +168,7 @@ func (Ctx *AppContext) UserList(frame Frame) {
 func (Ctx *AppContext) UserDelete(frame Frame) {
 	var user User
 	frame.BindJSON(&user)
-	Ctx.Db.Delete(&user)
+	if Ctx.IsAuthorized() && user.ID == Ctx.User.ID {
+		Ctx.Db.Delete(&user)
+	}
 }

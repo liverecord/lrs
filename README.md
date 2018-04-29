@@ -1,7 +1,10 @@
 # LiveRecord Server 
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/liverecord/server)](https://goreportcard.com/report/github.com/liverecord/server)
+[![License](https://img.shields.io/github/license/liverecord/server.svg)](https://github.com/liverecord/server)
 [![Build Status](https://travis-ci.org/liverecord/server.svg?branch=master)](https://travis-ci.org/liverecord/server)
+[![Github All Releases](https://img.shields.io/github/downloads/liverecord/server/total.svg)](https://github.com/liverecord/server)
+
 
 This is socket server for LiveRecord communication platform.
 

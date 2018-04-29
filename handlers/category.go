@@ -9,7 +9,7 @@ import (
 func (Ctx *AppContext) CategoryList(frame Frame) {
 	var categories []Category
 	Ctx.Db.Find(&categories)
-	Ctx.Ws.WriteJSON(NewFrame(CategoryListFrame, categories, ""))
+	Ctx.Pool.Write(Ctx.Ws, NewFrame(CategoryListFrame, categories, frame.RequestID))
 }
 
 func (Ctx *AppContext) CategorySave(frame Frame) {
@@ -25,7 +25,9 @@ func (Ctx *AppContext) CategorySave(frame Frame) {
 				category.ID = 0
 				fmt.Println(frame.Data)
 				err = Ctx.Db.Set("gorm:association_autoupdate", false).Save(&category).Error
-				Ctx.Ws.WriteJSON(NewFrame(CategorySaveFrame, category, ""))
+
+				Ctx.Pool.Write(Ctx.Ws, NewFrame(CategorySaveFrame, category, frame.RequestID))
+
 			}
 			if err != nil {
 				Ctx.Logger.WithError(err).Error("Unable to save category")

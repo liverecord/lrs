@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -22,15 +21,10 @@ func (Ctx *AppContext) Topic(frame server.Frame) {
 			Preload("User").
 			Where("slug = ?", slug).First(&topic)
 		if topic.ID > 0 {
-			ts, err := json.Marshal(topic)
-			if err == nil {
-				topicFrame := server.Frame{Type: server.TopicFrame, Data: string(ts)}
-				Ctx.Ws.WriteJSON(topicFrame)
-				Ctx.CommentList(topicFrame)
-				Ctx.Db.Model(&topic).UpdateColumn("total_views", gorm.Expr("total_views + ?", 1))
-			} else {
-				Ctx.Logger.WithError(err).Error()
-			}
+			f := server.NewFrame(server.TopicFrame, topic, frame.RequestID)
+			Ctx.Pool.Write(Ctx.Ws, f)
+			Ctx.CommentList(f)
+			Ctx.Db.Model(&topic).UpdateColumn("total_views", gorm.Expr("total_views + ?", 1))
 		}
 	}
 }
@@ -84,7 +78,8 @@ func (Ctx *AppContext) TopicList(frame server.Frame) {
 		Offset((page - 1) * 100).
 		Limit(100).
 		Find(&topics)
-	Ctx.Ws.WriteJSON(server.NewFrame(server.TopicListFrame, topics, ""))
+	f := server.NewFrame(server.TopicListFrame, topics, frame.RequestID)
+	Ctx.Pool.Write(Ctx.Ws, f)
 }
 
 func (Ctx *AppContext) TopicDelete(frame server.Frame) {
@@ -120,8 +115,8 @@ func (Ctx *AppContext) TopicSave(frame server.Frame) {
 					oldTopic.Acl = topic.Acl
 					oldTopic.Body = topic.Body
 					err = Ctx.Db.Set("gorm:association_autoupdate", false).Save(&oldTopic).Error
-
-					Ctx.Ws.WriteJSON(server.NewFrame(server.TopicSaveFrame, topic, frame.RequestID))
+					f := server.NewFrame(server.TopicSaveFrame, topic, frame.RequestID)
+					Ctx.Pool.Write(Ctx.Ws, f)
 					if topic.Private == false {
 						Ctx.Pool.Broadcast(server.NewFrame(server.TopicSaveFrame, topic, ""))
 					}
@@ -134,8 +129,8 @@ func (Ctx *AppContext) TopicSave(frame server.Frame) {
 				//topic.
 				fmt.Println(frame.Data)
 				err = Ctx.Db.Set("gorm:association_autoupdate", false).Save(&topic).Error
-
-				Ctx.Ws.WriteJSON(server.NewFrame(server.TopicSaveFrame, topic, frame.RequestID))
+				f := server.NewFrame(server.TopicSaveFrame, topic, frame.RequestID)
+				Ctx.Pool.Write(Ctx.Ws, f)
 				if topic.Private == false {
 					Ctx.Pool.Broadcast(server.NewFrame(server.TopicSaveFrame, topic, ""))
 				}

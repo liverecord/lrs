@@ -22,9 +22,9 @@ var Db *gorm.DB
 var Cfg *server.Config
 var logger *logrus.Logger
 
-func init()  {
- 	logger = logrus.New()
- 	logger.Formatter = &logrus.TextFormatter{ForceColors:true}
+func init() {
+	logger = logrus.New()
+	logger.Formatter = &logrus.TextFormatter{ForceColors: true}
 	logger.Out = os.Stdout
 }
 
@@ -56,11 +56,11 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 
 		// our registry
 		var lr = handlers.AppContext{
-			Db:      Db,
-			Cfg:     Cfg,
-			Logger:  logger,
-			Ws:      ws,
-			Pool:    pool,
+			Db:     Db,
+			Cfg:    Cfg,
+			Logger: logger,
+			Ws:     ws,
+			Pool:   pool,
 		}
 
 		if len(jwt) > 0 {
@@ -85,6 +85,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 				break
 			} else {
 				logger.Debugf("Frame: %v", f)
+
 				// We use reflection to call methods
 				// Method name must match Frame.Type
 				lrv := reflect.ValueOf(&lr)
@@ -165,15 +166,15 @@ func main() {
 	go func() {
 		for _ = range ticker.C {
 			/*
-			pool.Broadcast(server.NewFrame(server.PingFrame, "", ""))
+				pool.Broadcast(server.NewFrame(server.PingFrame, "", ""))
 
-			var comment server.Comment
-			Db.
-				Preload("User").
-				Preload("Topic").
-				Order(gorm.Expr("rand()")).
-				First(&comment)
-*/
+				var comment server.Comment
+				Db.
+					Preload("User").
+					Preload("Topic").
+					Order(gorm.Expr("rand()")).
+					First(&comment)
+			*/
 			// pool.Broadcast(server.NewFrame(server.CommentFrame, comment, ""))
 		}
 	}()
@@ -184,6 +185,5 @@ func main() {
 		logger.WithError(err).Panic("Can't bind address & port")
 	}
 	logger.Printf("Listening on %s", addr)
-
 
 }
