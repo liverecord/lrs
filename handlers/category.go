@@ -1,5 +1,7 @@
 package handlers
 
+import "github.com/liverecord/lrs"
+
 // CategoryList sends list of categories
 func (Ctx *AppContext) CategoryList(frame lrs.Frame) {
 	var categories []lrs.Category
