@@ -1,4 +1,4 @@
-package server
+package lrs
 
 import (
 	"crypto/rand"
@@ -15,20 +15,21 @@ import (
 
 type User struct {
 	Model
-	Email    string          `validator:"email" gorm:"unique_index" json:"email"`
-	Password string          `json:"-"`
-	Hash     string          `json:"-"`
-	Name     string          `json:"name"`
-	Slug     string          `json:"slug" gorm:"unique_index"`
-	Picture  string          `json:"picture"`
-	About    string          `json:"about,omitempty"`
-	Gender   string          `json:"gender,omitempty"`
-	Rank     float32         `json:"rank"`
-	Online   bool            `json:"online"`
-	Roles    []Role          `json:"roles,omitempty"`
-	Profiles []SocialProfile `json:"profiles,omitempty" gorm:"[]"`
-	Devices  []Devices
-	Settings Settings
+	Email         string          `validator:"email" gorm:"unique_index" json:"email"`
+	EmailVerified bool            `gorm:"default:false" json:"email_verified"`
+	Password      string          `json:"-"`
+	Hash          string          `json:"-"`
+	Name          string          `json:"name"`
+	Slug          string          `json:"slug" gorm:"unique_index"`
+	Picture       string          `json:"picture"`
+	About         string          `json:"about,omitempty"`
+	Gender        string          `json:"gender,omitempty"`
+	Rank          float32         `json:"rank"`
+	Online        bool            `json:"online"`
+	Roles         []Role          `json:"roles,omitempty"`
+	Profiles      []SocialProfile `json:"profiles,omitempty" gorm:"[]"`
+	Devices       []Device
+	Settings      Settings
 
 	// Status?
 
@@ -37,12 +38,12 @@ type User struct {
 	// Offline
 }
 
-type Devices struct {
+type Device struct {
 	UserID       uint
 	DeviceID     string
 	Type         string // browser, phone
 	UserAgent    string
-	LastIp       net.Addr
+	LastIP       net.Addr
 	AccessAt     time.Time
 	Subscribed   bool
 	PushEndpoint string
@@ -64,11 +65,11 @@ type Settings struct {
 
 type SocialProfile struct {
 	Model
-	NetworkId string    `json:"network_id"`
+	NetworkID string    `json:"network_id"`
 	Network   string    `json:"name"`
 	Token     string    `json:"-"`
 	ExpiresAt time.Time `json:"-"`
-	UserId    uint
+	UserID    uint
 }
 
 type Role struct {

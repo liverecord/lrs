@@ -1,5 +1,6 @@
-package server
+package lrs
 
+// Category of topics
 type Category struct {
 	Model
 	Name        string `json:"name"`

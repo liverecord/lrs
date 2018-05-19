@@ -1,4 +1,4 @@
-package server
+package lrs
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 
 	"github.com/gosimple/slug"
 	"github.com/jinzhu/gorm"
-	"github.com/liverecord/server/common"
+	"github.com/liverecord/lrs/common"
 )
 
 type Topic struct {

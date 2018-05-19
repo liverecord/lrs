@@ -1,4 +1,4 @@
-package server
+package lrs
 
 import (
 	"github.com/gorilla/websocket"

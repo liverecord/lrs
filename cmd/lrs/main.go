@@ -2,7 +2,9 @@ package main
 
 import (
 	"crypto/rand"
+	"encoding/json"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"reflect"
@@ -13,14 +15,14 @@ import (
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
 	"github.com/joho/godotenv"
-	"github.com/liverecord/server"
-	"github.com/liverecord/server/common"
-	"github.com/liverecord/server/handlers"
+	"github.com/liverecord/lrs/common"
+	"github.com/liverecord/lrs/handlers"
 )
 
-var Db *gorm.DB
-var Cfg *server.Config
+var db *gorm.DB
+var cfg *lrs.Config
 var logger *logrus.Logger
+var uploadDir string
 
 func init() {
 	logger = logrus.New()
@@ -34,7 +36,7 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-var pool = server.NewConnectionPool()
+var pool = lrs.NewConnectionPool()
 
 func handleConnections(w http.ResponseWriter, r *http.Request) {
 
@@ -52,12 +54,12 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 		// Register our new client
 		pool.AddConnection(ws)
 
-		ws.WriteJSON(server.NewFrame(server.PingFrame, " ", ""))
+		ws.WriteJSON(lrs.NewFrame(lrs.PingFrame, " ", ""))
 
 		// our registry
 		var lr = handlers.AppContext{
-			Db:     Db,
-			Cfg:    Cfg,
+			Db:     db,
+			Cfg:    cfg,
 			Logger: logger,
 			Ws:     ws,
 			Pool:   pool,
@@ -76,28 +78,47 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 		// For example, you can build plugins with your methods and extend this app
 		// The current implementation is a rough idea of self-declaring routing
 		for {
-			var f server.Frame
-			err := ws.ReadJSON(&f)
+			var f lrs.Frame
+			mt, reader, err := ws.NextReader()
 			if err != nil {
-				logger.WithError(err).Errorln("Unable to read request")
-				// we drop this connection because Frames must be parsable
+				logger.WithError(err).Errorln("Unable to read socket data")
 				pool.DropConnection(ws)
 				break
-			} else {
-				logger.Debugf("Frame: %v", f)
+			}
+			switch mt {
+			case websocket.TextMessage:
+				err = json.NewDecoder(reader).Decode(&f)
+				if err != nil {
+					logger.WithError(err).Errorln("Unable to read the Frame")
 
-				// We use reflection to call methods
-				// Method name must match Frame.Type
-				lrv := reflect.ValueOf(&lr)
-				frv := reflect.ValueOf(f)
-				method := lrv.MethodByName(f.Type)
-				if method.IsValid() &&
-					method.Type().NumIn() == 1 &&
-					method.Type().In(0).AssignableTo(reflect.TypeOf(server.Frame{})) {
-					method.Call([]reflect.Value{frv})
+					// we drop this connection because Frames must be parsable
+					pool.DropConnection(ws)
+					break
 				} else {
-					lr.Logger.Errorf("method %s is invalid", f.Type)
+					logger.Debugf("Frame: %v", f)
+
+					// We use reflection to call methods
+					// Method name must match Frame.Type
+					lrv := reflect.ValueOf(&lr)
+					frv := reflect.ValueOf(f)
+					method := lrv.MethodByName(f.Type)
+					if method.IsValid() &&
+						method.Type().NumIn() == 1 &&
+						method.Type().In(0).AssignableTo(reflect.TypeOf(lrs.Frame{})) {
+						method.Call([]reflect.Value{frv})
+					} else {
+						lr.Logger.Errorf("method %s is invalid", f.Type)
+					}
 				}
+			case websocket.BinaryMessage:
+				if lr.IsAuthorized() {
+					lr.Uploader(reader)
+				} else {
+					lr.Logger.Errorln("Unauthorized upload from", ws.RemoteAddr())
+				}
+			case websocket.CloseMessage:
+				pool.DropConnection(ws)
+				break
 			}
 		}
 	}
@@ -116,7 +137,7 @@ func main() {
 	}
 
 	// open db connection
-	Db, err = gorm.Open(
+	db, err = gorm.Open(
 		"mysql",
 		common.Env("MYSQL_DSN", "root:123@tcp(127.0.0.1:3306)/liveRecord?charset=utf8&parseTime=True"))
 
@@ -124,10 +145,10 @@ func main() {
 		logger.WithError(err).Panic("Can't connect to the database")
 	}
 
-	defer Db.Close()
+	defer db.Close()
 	if common.BoolEnv("DEBUG", false) {
-		Db.LogMode(true)
-		Db.Debug()
+		db.LogMode(true)
+		db.Debug()
 		logger.SetLevel(logrus.DebugLevel)
 	}
 
@@ -138,44 +159,61 @@ func main() {
 	http.HandleFunc("/api/oauth/", handleOauth)
 	http.HandleFunc("/api/oauth/facebook/", handleOauth)
 
-	Db.AutoMigrate(&server.Config{})
-	Db.AutoMigrate(&server.User{})
-	Db.AutoMigrate(&server.Topic{})
-	Db.AutoMigrate(&server.Comment{})
-	Db.AutoMigrate(&server.Category{})
-	Db.AutoMigrate(&server.SocialProfile{})
-	Db.AutoMigrate(&server.Role{})
-	Db.AutoMigrate(&server.CommentStatus{})
-	Db.AutoMigrate(&server.Attachment{})
+	db.AutoMigrate(&lrs.Config{})
+	db.AutoMigrate(&lrs.User{})
+	db.AutoMigrate(&lrs.Topic{})
+	db.AutoMigrate(&lrs.Comment{})
+	db.AutoMigrate(&lrs.Category{})
+	db.AutoMigrate(&lrs.SocialProfile{})
+	db.AutoMigrate(&lrs.Role{})
+	db.AutoMigrate(&lrs.CommentStatus{})
+	db.AutoMigrate(&lrs.Device{})
+	db.AutoMigrate(&lrs.Settings{})
+	db.AutoMigrate(&lrs.Attachment{})
 
-	var config server.Config
-	Db.First(&config)
+	var config lrs.Config
+	db.First(&config)
 
 	if config.ID == 0 {
 		// lets set this application with default parameters
 		config.JwtSignature = make([]byte, 256)
-		_, err = io.ReadFull(rand.Reader, config.JwtSignature)
-		logger.WithError(err).Errorln("Unable to generate JWT Signature")
-		Db.Save(&config)
+		if _, err = io.ReadFull(rand.Reader, config.JwtSignature); err != nil {
+			logger.WithError(err).Errorln("Unable to generate JWT Signature")
+		}
+		config.DocumentRoot = common.Env("DOCUMENT_ROOT", "assets")
+		config.Domain = common.Env("DOMAIN", "localhost")
+		config.Protocol = common.Env("PROTOCOL", "http")
+		config.Port = uint(common.IntEnv("PORT", 80))
+		config.SMTP.Host = common.Env("SMTP_HOST", "localhost")
+		config.SMTP.Port = common.IntEnv("SMTP_PORT", 25)
+		config.SMTP.Username = common.Env("SMTP_USERNAME", "")
+		config.SMTP.Password = common.Env("SMTP_PASSWORD", "")
+		config.SMTP.InsecureTLS = common.BoolEnv("SMTP_INSECURE_TLS", false)
+		config.SMTP.SSL = common.BoolEnv("SMTP_SSL", false)
+		config.UploadDir, err = ioutil.TempDir("/tmp", "lr_")
+		if err != nil {
+			logger.WithError(err).Errorln("Unable to create temporary dir. Is '/tmp' writable?")
+		}
+		db.Save(&config)
 	}
 
-	Cfg = &config
+	cfg = &config
 
 	ticker := time.NewTicker(time.Second)
 
 	go func() {
 		for _ = range ticker.C {
 			/*
-				pool.Broadcast(server.NewFrame(server.PingFrame, "", ""))
+				pool.Broadcast(lrs.NewFrame(lrs.PingFrame, "", ""))
 
-				var comment server.Comment
+				var comment lrs.Comment
 				Db.
 					Preload("User").
 					Preload("Topic").
 					Order(gorm.Expr("rand()")).
 					First(&comment)
 			*/
-			// pool.Broadcast(server.NewFrame(server.CommentFrame, comment, ""))
+			// pool.Broadcast(lrs.NewFrame(lrs.CommentFrame, comment, ""))
 		}
 	}()
 

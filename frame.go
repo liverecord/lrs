@@ -1,4 +1,4 @@
-package server
+package lrs
 
 import "encoding/json"
 
@@ -24,6 +24,9 @@ const (
 	CommentListFrame    = "CommentList"
 	CommentSaveFrame    = "CommentSave"
 	UserFrame           = "User"
+	ResetPasswordFrame  = "ResetPassword"
+	FileUploadFrame     = "Upload"
+	CancelUploadFrame   = "CancelUpload"
 )
 
 type Frame struct {

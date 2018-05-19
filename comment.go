@@ -1,4 +1,4 @@
-package server
+package lrs
 
 import "time"
 
@@ -23,7 +23,7 @@ type Attachment struct {
 	Description string `json:"description"`
 	Link        string `json:"link"`
 	Thumbnail   string `json:"thumbnail"`
-	Html        string `json:"html"`
+	HTML        string `json:"html"`
 }
 
 type CommentStatus struct {

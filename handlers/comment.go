@@ -3,7 +3,7 @@ package handlers
 import (
 	"fmt"
 
-	. "github.com/liverecord/server"
+	. "github.com/liverecord/lrs"
 )
 
 func (Ctx *AppContext) CommentList(frame Frame) {
@@ -46,13 +46,13 @@ func (Ctx *AppContext) CommentList(frame Frame) {
 	}
 
 	type CommentTopic struct {
-		TopicId    uint
+		TopicID    uint
 		TopicSlug  string
 		TopicTitle string
 	}
 
 	type CommentCategory struct {
-		CategoryId   uint
+		CategoryID   uint
 		CategorySlug string
 		CategoryName string
 	}
@@ -87,8 +87,8 @@ func (Ctx *AppContext) CommentList(frame Frame) {
 			}
 
 			if err := Ctx.Db.ScanRows(rows, &commCat); err == nil {
-				comm.Topic.CategoryID = commCat.CategoryId
-				comm.Topic.Category.ID = commCat.CategoryId
+				comm.Topic.CategoryID = commCat.CategoryID
+				comm.Topic.Category.ID = commCat.CategoryID
 				comm.Topic.Category.Slug = commCat.CategorySlug
 				comm.Topic.Category.Name = commCat.CategoryName
 				Ctx.Logger.Debugln(commCat)

@@ -6,7 +6,7 @@ import (
 
 	"github.com/jinzhu/gorm"
 
-	"github.com/liverecord/server"
+	server "github.com/liverecord/lrs"
 )
 
 func (Ctx *AppContext) Topic(frame server.Frame) {

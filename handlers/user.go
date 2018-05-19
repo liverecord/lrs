@@ -8,25 +8,31 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/dgrijalva/jwt-go"
-	. "github.com/liverecord/server"
-	. "github.com/liverecord/server/common"
+	. "github.com/liverecord/lrs"
+	. "github.com/liverecord/lrs/common"
+	"github.com/liverecord/lrs/mailer"
+	"github.com/sethvargo/go-password/password"
 	"golang.org/x/crypto/bcrypt"
 )
 
+// UserLoginData for jwt auth
 type UserLoginData struct {
 	Jwt  string `json:"jwt"`
 	User User   `json:"user"`
 }
 
+// UserInfoRequest to get user data
 type UserInfoRequest struct {
 	Slug string `json:"slug"`
 }
 
+// UsersSearchRequest request about users
 type UsersSearchRequest struct {
 	Term         string `json:"term"`
 	ExcludeUsers []uint `json:"exclude"`
 }
 
+// Auth used to authorized user
 func (Ctx *AppContext) Auth(frame Frame) {
 	var authData UserAuthData
 	frame.BindJSON(&authData)
@@ -109,6 +115,33 @@ func (Ctx *AppContext) AuthorizeJWT(tokenString string) {
 		Ctx.Logger.Error(err)
 	}
 
+}
+
+func (Ctx *AppContext) ResetPassword(frame Frame) {
+	if Ctx.IsAuthorized() {
+		return
+	}
+	// generate bad ass password
+	var user User
+	var email string
+	frame.BindJSON(&email)
+
+	Ctx.Db.Where("email = ?", email).First(&user)
+	if user.ID == 0 {
+		Ctx.Pool.Write(Ctx.Ws, NewFrame(ResetPasswordFrame, "missing", frame.RequestID))
+		return
+	}
+	newPassword, err := password.Generate(16, 4, 12, false, false)
+	if err != nil {
+		Ctx.Logger.WithError(err)
+		Ctx.Pool.Write(Ctx.Ws, NewFrame(ResetPasswordFrame, "error", frame.RequestID))
+
+		return
+	}
+	user.SetPassword(newPassword)
+	Ctx.Db.Save(&user)
+	mailer.SendPasswordReset(Ctx.Cfg, user, newPassword)
+	Ctx.Pool.Write(Ctx.Ws, NewFrame(ResetPasswordFrame, "ok", frame.RequestID))
 }
 
 func (Ctx *AppContext) UserInfo(frame Frame) {

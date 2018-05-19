@@ -3,22 +3,23 @@ package handlers
 import (
 	"github.com/Sirupsen/logrus"
 	"github.com/jinzhu/gorm"
-	"github.com/liverecord/server"
 
 	"github.com/gorilla/websocket"
+	"github.com/liverecord/lrs"
 )
 
 type AppContext struct {
-	Cfg     *server.Config
-	Db      *gorm.DB
-	Logger  *logrus.Logger
-	Ws      *websocket.Conn
-	User    *server.User
-	Pool 	*server.ConnectionPool
+	Cfg    *lrs.Config
+	Db     *gorm.DB
+	Logger *logrus.Logger
+	Ws     *websocket.Conn
+	User   *lrs.User
+	Pool   *lrs.ConnectionPool
+	File   *File
 }
 
 type ConnectionContext struct {
-	App     *AppContext
-	Ws      *websocket.Conn
-	User    *server.User
+	App  *AppContext
+	Ws   *websocket.Conn
+	User *lrs.User
 }

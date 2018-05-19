@@ -34,6 +34,20 @@ func BoolEnv(key string, def bool) bool {
 	return boolVal
 }
 
+func IntEnv(key string, def int) int {
+	val, set := os.LookupEnv(key)
+	if !set {
+		return def
+	}
+
+	intVal, err := strconv.Atoi(val)
+	if err != nil {
+		return def
+	}
+
+	return intVal
+}
+
 func StripTags(html string) string {
 	p := bluemonday.StripTagsPolicy()
 	return p.Sanitize(html)
