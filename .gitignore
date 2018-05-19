@@ -1,7 +1,9 @@
 .idea
 .env
+.vscode
 server
 bin
 dist
+files
 *.tar.gz
 *.zip
