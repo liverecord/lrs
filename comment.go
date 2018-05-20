@@ -2,6 +2,7 @@ package lrs
 
 import "time"
 
+// Comment on the topic
 type Comment struct {
 	Model
 	TopicID     uint         `json:"topicId" sql:"index"`
@@ -16,6 +17,7 @@ type Comment struct {
 	Moderated   bool         `json:"moderated"`
 }
 
+// Attachment for comment
 type Attachment struct {
 	Model
 	Type        string `json:"type"`
@@ -26,6 +28,7 @@ type Attachment struct {
 	HTML        string `json:"html"`
 }
 
+// CommentStatus used to track read statuses of comments
 type CommentStatus struct {
 	Model
 	CommentID  uint       `json:"commentId"`
