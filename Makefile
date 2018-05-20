@@ -13,7 +13,7 @@ clean:
 build:
 	go get
 	mkdir -p ./bin
-	go build -o ./bin/lrs ./cmd/liverecord
+	go build -o ./bin/lrs ./cmd/lrs
 	chmod a+x ./bin/lrs
 
 it:
