@@ -123,13 +123,13 @@ func (Ctx *AppContext) CommentSave(frame Frame) {
 				var topic Topic
 				Ctx.Db.First(&topic, comment.TopicID)
 				if topic.ID > 0 {
-					Ctx.Logger.Debugf("%v", topic.Acl)
+					Ctx.Logger.Debugf("%v", topic.ACL)
 					if topic.Private {
 						// broadcast only to people from acl or author
 						fr := NewFrame(CommentSaveFrame, comment, frame.RequestID)
 						Ctx.Pool.Send(&topic.User, fr)
-						for u := range topic.Acl {
-							Ctx.Pool.Send(&topic.Acl[u], fr)
+						for u := range topic.ACL {
+							Ctx.Pool.Send(&topic.ACL[u], fr)
 						}
 
 					} else {
