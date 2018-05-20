@@ -15,6 +15,7 @@ import (
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
 	"github.com/joho/godotenv"
+	"github.com/liverecord/lrs"
 	"github.com/liverecord/lrs/common"
 	"github.com/liverecord/lrs/handlers"
 )
@@ -47,79 +48,79 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 	logger.WithFields(logrus.Fields{"JWT": jwt}).Info("Request")
 	if err != nil {
 		logger.WithError(err).Error("Cannot upgrade protocol")
-	} else {
-		// Make sure we close the connection when the function returns
-		defer pool.DropConnection(ws)
+		return
+	}
+	// Make sure we close the connection when the function returns
+	defer pool.DropConnection(ws)
 
-		// Register our new client
-		pool.AddConnection(ws)
+	// Register our new client
+	pool.AddConnection(ws)
 
-		ws.WriteJSON(lrs.NewFrame(lrs.PingFrame, " ", ""))
+	ws.WriteJSON(lrs.NewFrame(lrs.PingFrame, " ", ""))
 
-		// our registry
-		var lr = handlers.AppContext{
-			Db:     db,
-			Cfg:    cfg,
-			Logger: logger,
-			Ws:     ws,
-			Pool:   pool,
+	// our registry
+	var lr = handlers.AppContext{
+		Db:     db,
+		Cfg:    cfg,
+		Logger: logger,
+		Ws:     ws,
+		Pool:   pool,
+	}
+
+	if len(jwt) > 0 {
+		lr.AuthorizeJWT(jwt)
+		if lr.IsAuthorized() {
+			pool.Authenticate(ws, lr.User)
 		}
-
-		if len(jwt) > 0 {
-			lr.AuthorizeJWT(jwt)
-			if lr.IsAuthorized() {
-				pool.Authenticate(ws, lr.User)
-			}
+	}
+	// The Magic Frame router
+	//
+	// Intention of this router serves simple purpose of providing easy way to develop
+	// and extend this application
+	// For example, you can build plugins with your methods and extend this app
+	// The current implementation is a rough idea of self-declaring routing
+	for {
+		var f lrs.Frame
+		mt, reader, err := ws.NextReader()
+		if err != nil {
+			logger.WithError(err).Errorln("Unable to read socket data")
+			pool.DropConnection(ws)
+			break
 		}
-		// The Magic Frame router
-		//
-		// Intention of this router serves simple purpose of providing easy way to develop
-		// and extend this application
-		// For example, you can build plugins with your methods and extend this app
-		// The current implementation is a rough idea of self-declaring routing
-		for {
-			var f lrs.Frame
-			mt, reader, err := ws.NextReader()
+		switch mt {
+		case websocket.TextMessage:
+			err = json.NewDecoder(reader).Decode(&f)
 			if err != nil {
-				logger.WithError(err).Errorln("Unable to read socket data")
+				logger.WithError(err).Errorln("Unable to read the Frame")
+
+				// we drop this connection because Frames must be parsable
 				pool.DropConnection(ws)
 				break
-			}
-			switch mt {
-			case websocket.TextMessage:
-				err = json.NewDecoder(reader).Decode(&f)
-				if err != nil {
-					logger.WithError(err).Errorln("Unable to read the Frame")
+			} else {
+				logger.Debugf("Frame: %v", f)
 
-					// we drop this connection because Frames must be parsable
-					pool.DropConnection(ws)
-					break
+				// We use reflection to call methods
+				// Method name must match Frame.Type
+				lrv := reflect.ValueOf(&lr)
+				frv := reflect.ValueOf(f)
+				method := lrv.MethodByName(f.Type)
+				if method.IsValid() &&
+					method.Type().NumIn() == 1 &&
+					method.Type().In(0).AssignableTo(reflect.TypeOf(lrs.Frame{})) {
+					method.Call([]reflect.Value{frv})
 				} else {
-					logger.Debugf("Frame: %v", f)
-
-					// We use reflection to call methods
-					// Method name must match Frame.Type
-					lrv := reflect.ValueOf(&lr)
-					frv := reflect.ValueOf(f)
-					method := lrv.MethodByName(f.Type)
-					if method.IsValid() &&
-						method.Type().NumIn() == 1 &&
-						method.Type().In(0).AssignableTo(reflect.TypeOf(lrs.Frame{})) {
-						method.Call([]reflect.Value{frv})
-					} else {
-						lr.Logger.Errorf("method %s is invalid", f.Type)
-					}
+					lr.Logger.Errorf("method %s is invalid", f.Type)
 				}
-			case websocket.BinaryMessage:
-				if lr.IsAuthorized() {
-					lr.Uploader(reader)
-				} else {
-					lr.Logger.Errorln("Unauthorized upload from", ws.RemoteAddr())
-				}
-			case websocket.CloseMessage:
-				pool.DropConnection(ws)
-				break
 			}
+		case websocket.BinaryMessage:
+			if lr.IsAuthorized() {
+				lr.Uploader(reader)
+			} else {
+				lr.Logger.Errorln("Unauthorized upload from", ws.RemoteAddr())
+			}
+		case websocket.CloseMessage:
+			pool.DropConnection(ws)
+			break
 		}
 	}
 }
