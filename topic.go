@@ -9,6 +9,7 @@ import (
 	"github.com/liverecord/lrs/common"
 )
 
+// Topic defines the main forum topic structure
 type Topic struct {
 	Model
 	Slugged
@@ -19,11 +20,12 @@ type Topic struct {
 	Title         string   `json:"title"`
 	Body          string   `json:"body,omitempty" sql:"type:longtext"`
 	Order         int      `json:"order"`
-	Acl           []User   `json:"acl,omitempty" gorm:"many2many:topic_acl;association_autoupdate:false;association_autocreate:false"`
+	ACL           []User   `json:"acl,omitempty" gorm:"many2many:topic_acl;association_autoupdate:false;association_autocreate:false"`
 	TotalViews    uint32   `json:"total_views,omitempty"`
 	TotalComments uint32   `json:"total_comments,omitempty"`
 	Rank          uint32   `json:"rank,omitempty"`
 	Private       bool     `json:"private"`
+	Pinned        bool     `json:"pinned"`
 }
 
 func makeUniqueSlug(s *string, db *gorm.DB, i uint) {
@@ -35,12 +37,14 @@ func makeUniqueSlug(s *string, db *gorm.DB, i uint) {
 	}
 }
 
+// BeforeCreate hook
 func (t *Topic) BeforeCreate(scope *gorm.Scope) (err error) {
 	t.Slug = slug.Make(t.Title)
 	makeUniqueSlug(&t.Slug, scope.DB(), 0)
 	return
 }
 
+// BeforeSave hook
 func (t *Topic) BeforeSave() (err error) {
 	t.Title = strings.TrimSpace(t.Title)
 	t.Title = strings.Title(t.Title)
