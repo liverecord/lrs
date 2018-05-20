@@ -9,16 +9,16 @@ import (
 	server "github.com/liverecord/lrs"
 )
 
+// Topic sends topic data
 func (Ctx *AppContext) Topic(frame server.Frame) {
 	var topic server.Topic
-
 	var data map[string]string
 	frame.BindJSON(&data)
-
 	if slug, ok := data["slug"]; ok {
 		Ctx.Db.
 			Preload("Category").
 			Preload("User").
+			Preload("Acl").
 			Where("slug = ?", slug).First(&topic)
 		if topic.ID > 0 {
 			f := server.NewFrame(server.TopicFrame, topic, frame.RequestID)
@@ -29,6 +29,7 @@ func (Ctx *AppContext) Topic(frame server.Frame) {
 	}
 }
 
+// TopicList returns list of topics
 func (Ctx *AppContext) TopicList(frame server.Frame) {
 	var topics []server.Topic
 	var category server.Category
@@ -82,6 +83,7 @@ func (Ctx *AppContext) TopicList(frame server.Frame) {
 	Ctx.Pool.Write(Ctx.Ws, f)
 }
 
+// TopicDelete destroys the topic
 func (Ctx *AppContext) TopicDelete(frame server.Frame) {
 	if Ctx.IsAuthorized() {
 		var topic server.Topic
@@ -98,50 +100,50 @@ func (Ctx *AppContext) TopicDelete(frame server.Frame) {
 	}
 }
 
+// TopicSave saves the topic
 func (Ctx *AppContext) TopicSave(frame server.Frame) {
-	if Ctx.IsAuthorized() {
-		var topic server.Topic
-		err := frame.BindJSON(&topic)
-		Ctx.Logger.Info("Decoded topic", topic)
-		Ctx.Logger.Info("User", Ctx.User)
-		if err == nil {
-			topic.Private = len(topic.Acl) > 0
-			if topic.ID > 0 {
-				// find topic in DB and update it
-				var oldTopic server.Topic
-				Ctx.Db.Where("id = ?", topic.ID).First(&oldTopic)
-				if oldTopic.ID > 0 {
-					oldTopic.Title = topic.Title
-					oldTopic.Acl = topic.Acl
-					oldTopic.Body = topic.Body
-					err = Ctx.Db.Set("gorm:association_autoupdate", false).Save(&oldTopic).Error
-					f := server.NewFrame(server.TopicSaveFrame, topic, frame.RequestID)
-					Ctx.Pool.Write(Ctx.Ws, f)
-					if topic.Private == false {
-						Ctx.Pool.Broadcast(server.NewFrame(server.TopicSaveFrame, topic, ""))
-					}
-
-				}
-			} else {
-				// this is new topic
-				topic.ID = 0
-				topic.User.ID = Ctx.User.ID
-				//topic.
-				fmt.Println(frame.Data)
-				err = Ctx.Db.Set("gorm:association_autoupdate", false).Save(&topic).Error
-				f := server.NewFrame(server.TopicSaveFrame, topic, frame.RequestID)
-				Ctx.Pool.Write(Ctx.Ws, f)
-				if topic.Private == false {
-					Ctx.Pool.Broadcast(server.NewFrame(server.TopicSaveFrame, topic, ""))
-				}
+	if !Ctx.IsAuthorized() {
+		Ctx.Logger.WithField("msg", "Unauthorized topic save call").Info()
+		return
+	}
+	var topic server.Topic
+	err := frame.BindJSON(&topic)
+	Ctx.Logger.Info("Decoded topic", topic)
+	Ctx.Logger.Info("User", Ctx.User)
+	if err != nil {
+		Ctx.Logger.WithError(err).Error("Can't unmarshall topic")
+		return
+	}
+	topic.Private = len(topic.ACL) > 0
+	if topic.ID > 0 {
+		// find topic in DB and update it
+		var oldTopic server.Topic
+		Ctx.Db.Where("id = ?", topic.ID).First(&oldTopic)
+		if oldTopic.ID > 0 {
+			oldTopic.Title = topic.Title
+			oldTopic.ACL = topic.ACL
+			oldTopic.Body = topic.Body
+			err = Ctx.Db.Set("gorm:association_autoupdate", false).Save(&oldTopic).Error
+			f := server.NewFrame(server.TopicSaveFrame, topic, frame.RequestID)
+			Ctx.Pool.Write(Ctx.Ws, f)
+			if topic.Private == false {
+				Ctx.Pool.Broadcast(server.NewFrame(server.TopicSaveFrame, topic, ""))
 			}
-			if err != nil {
-				Ctx.Logger.WithError(err).Error("Unable to save topic")
-			}
-		} else {
-			Ctx.Logger.WithError(err).Error("Can't unmarshall topic")
 		}
 	} else {
-		Ctx.Logger.WithField("msg", "Unauthorized topic save call").Info()
+		// this is new topic
+		topic.ID = 0
+		topic.User.ID = Ctx.User.ID
+		//topic.
+		fmt.Println(frame.Data)
+		err = Ctx.Db.Set("gorm:association_autoupdate", false).Save(&topic).Error
+		f := server.NewFrame(server.TopicSaveFrame, topic, frame.RequestID)
+		Ctx.Pool.Write(Ctx.Ws, f)
+		if topic.Private == false {
+			Ctx.Pool.Broadcast(server.NewFrame(server.TopicSaveFrame, topic, ""))
+		}
+	}
+	if err != nil {
+		Ctx.Logger.WithError(err).Error("Unable to save topic")
 	}
 }
