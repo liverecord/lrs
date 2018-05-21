@@ -12,9 +12,10 @@ import (
 	"time"
 
 	"github.com/gosimple/slug"
-	. "github.com/liverecord/lrs"
+	"github.com/liverecord/lrs"
 )
 
+// File stucture defines upload
 type File struct {
 	Name         string    `json:"name"`
 	Size         int       `json:"size"`
@@ -24,16 +25,20 @@ type File struct {
 	PublicPath   string    `json:"path"`
 }
 
-func (Ctx *AppContext) Upload(frame Frame) {
+// Upload Handler
+func (Ctx *AppContext) Upload(frame lrs.Frame) {
 	var f File
 	frame.BindJSON(&f)
 	fmt.Println(frame, f)
 	Ctx.File = &f
 }
-func (Ctx *AppContext) CancelUpload(frame Frame) {
+
+// CancelUpload handler
+func (Ctx *AppContext) CancelUpload(frame lrs.Frame) {
 	Ctx.File = nil
 }
 
+// Uploader reads bytes from socket and writes them into file
 func (Ctx *AppContext) Uploader(reader io.Reader) {
 	if Ctx.File == nil {
 		Ctx.Logger.Println("File is not set")
@@ -53,8 +58,19 @@ func (Ctx *AppContext) Uploader(reader io.Reader) {
 	}
 	buf := make([]byte, bufferSize)
 	total := 0
+	Ctx.File.Uploaded = total
+	Ctx.Pool.Write(Ctx.Ws, lrs.NewFrame(lrs.CancelUploadFrame, Ctx.File, ""))
 	for {
+		if Ctx.File == nil {
+			Ctx.Logger.Println("File is not set or Upload was cancelled!")
+			file.Close()
+			os.Remove(file.Name())
+			Ctx.Pool.Write(Ctx.Ws, lrs.NewFrame(lrs.CancelUploadFrame, Ctx.File, ""))
+			return
+		}
+		fmt.Print(".")
 		n, err := reader.Read(buf)
+		fmt.Print(":")
 		if err != nil {
 			break
 		}
@@ -64,18 +80,12 @@ func (Ctx *AppContext) Uploader(reader io.Reader) {
 		file.Write(buf[:n])
 		total += n
 		Ctx.File.Uploaded = total
-
-		time.Sleep(time.Millisecond * time.Duration(rand.Int63n(10000)+50))
-
-		if Ctx.File == nil {
-			Ctx.Logger.Println("File is not set or Upload was cancelled!")
-			file.Close()
-			os.Remove(file.Name())
-			Ctx.Pool.Write(Ctx.Ws, NewFrame(CancelUploadFrame, Ctx.File, ""))
-			return
+		Ctx.Pool.Write(Ctx.Ws, lrs.NewFrame(lrs.FileUploadFrame, Ctx.File, ""))
+		if total == Ctx.File.Size {
+			// we done with upload!
+			break
 		}
-
-		Ctx.Pool.Write(Ctx.Ws, NewFrame(FileUploadFrame, Ctx.File, ""))
+		time.Sleep(time.Millisecond * time.Duration(rand.Int63n(1000)+50))
 	}
 	h := md5.New()
 	if _, err := io.Copy(h, file); err != nil {
@@ -93,7 +103,7 @@ func (Ctx *AppContext) Uploader(reader io.Reader) {
 		Ctx.Logger.WithError(err).Errorln("Unable to create path")
 		return
 	}
-	//,
+	//
 	ext := path.Ext(Ctx.File.Name)
 	base := strings.TrimSuffix(path.Base(Ctx.File.Name), ext)
 	safeFileName := fmt.Sprintf("%s-%x%s", slug.Make(base), h.Sum(nil)[:3], ext)
@@ -101,6 +111,6 @@ func (Ctx *AppContext) Uploader(reader io.Reader) {
 	fp = path.Join(fp, safeFileName)
 	file.Close()
 	os.Rename(file.Name(), fp)
-	Ctx.Pool.Write(Ctx.Ws, NewFrame(FileUploadFrame, Ctx.File, ""))
+	Ctx.Pool.Write(Ctx.Ws, lrs.NewFrame(lrs.FileUploadFrame, Ctx.File, ""))
 	Ctx.File = nil
 }
