@@ -91,6 +91,7 @@ func (Ctx *AppContext) generateToken(user User) (UserLoginData, error) {
 	return uld, err
 }
 
+// AuthorizeJWT for checking the JWT token
 func (Ctx *AppContext) AuthorizeJWT(tokenString string) {
 
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {

@@ -3,13 +3,14 @@ package handlers
 import (
 	"fmt"
 
-	. "github.com/liverecord/lrs"
+	"github.com/liverecord/lrs"
 )
 
-func (Ctx *AppContext) CommentList(frame Frame) {
-	var comments []Comment
-	comments = make([]Comment, 0, 1)
-	var topic Topic
+// CommentList returns list of comments
+func (Ctx *AppContext) CommentList(frame lrs.Frame) {
+	var comments []lrs.Comment
+	comments = make([]lrs.Comment, 0, 1)
+	var topic lrs.Topic
 	err := frame.BindJSON(&topic)
 	if err != nil {
 		Ctx.Logger.WithError(err)
@@ -61,7 +62,7 @@ func (Ctx *AppContext) CommentList(frame Frame) {
 
 	if err == nil {
 		for rows.Next() {
-			var comm Comment
+			var comm lrs.Comment
 			var commTopic CommentTopic
 			var commCat CommentCategory
 			var commUser CommentUser
@@ -100,18 +101,22 @@ func (Ctx *AppContext) CommentList(frame Frame) {
 		// cats, _ := json.Marshal(comments)
 		// Ctx.Ws.WriteJSON(Frame{Type: CommentListFrame, Data: string(cats)})
 
-		Ctx.Pool.Write(Ctx.Ws, NewFrame(CommentListFrame, comments, frame.RequestID))
+		Ctx.Pool.Write(Ctx.Ws, lrs.NewFrame(lrs.CommentListFrame, comments, frame.RequestID))
 
 	} else {
 		Ctx.Logger.WithError(err)
 	}
 }
+
+// BroadcastComment sends comment to topic subscribers
 func (Ctx *AppContext) BroadcastComment() {
 
 }
-func (Ctx *AppContext) CommentSave(frame Frame) {
+
+// CommentSave saves the comment
+func (Ctx *AppContext) CommentSave(frame lrs.Frame) {
 	if Ctx.IsAuthorized() {
-		var comment Comment
+		var comment lrs.Comment
 		err := frame.BindJSON(&comment)
 		Ctx.Logger.Info("Decoded comment", comment)
 		Ctx.Logger.Info("User", Ctx.User)
@@ -120,13 +125,13 @@ func (Ctx *AppContext) CommentSave(frame Frame) {
 			comment.User = *Ctx.User
 
 			if comment.TopicID > 0 {
-				var topic Topic
+				var topic lrs.Topic
 				Ctx.Db.First(&topic, comment.TopicID)
 				if topic.ID > 0 {
 					Ctx.Logger.Debugf("%v", topic.ACL)
 					if topic.Private {
 						// broadcast only to people from acl or author
-						fr := NewFrame(CommentSaveFrame, comment, frame.RequestID)
+						fr := lrs.NewFrame(lrs.CommentSaveFrame, comment, frame.RequestID)
 						Ctx.Pool.Send(&topic.User, fr)
 						for u := range topic.ACL {
 							Ctx.Pool.Send(&topic.ACL[u], fr)
@@ -146,7 +151,7 @@ func (Ctx *AppContext) CommentSave(frame Frame) {
 				fmt.Println(frame.Data)
 				err = Ctx.Db.Set("gorm:association_autoupdate", false).Save(&comment).Error
 				if err == nil {
-					Ctx.Pool.Broadcast(NewFrame(CommentSaveFrame, comment, frame.RequestID))
+					Ctx.Pool.Broadcast(lrs.NewFrame(lrs.CommentSaveFrame, comment, frame.RequestID))
 				}
 			}
 			if err != nil {
