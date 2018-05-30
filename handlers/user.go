@@ -190,6 +190,9 @@ func (Ctx *AppContext) UserList(frame Frame) {
 	}
 	a.Limit(10).Find(&users)
 	if users != nil {
+		for _, u := range users {
+			u = u.SafePluck()
+		}
 		userData, err := json.Marshal(users)
 		if err == nil {
 			Ctx.Pool.Write(Ctx.Ws, Frame{Type: UserListFrame, Data: string(userData)})

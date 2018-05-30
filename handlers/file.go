@@ -85,7 +85,7 @@ func (Ctx *AppContext) Uploader(reader io.Reader) {
 			// we done with upload!
 			break
 		}
-		time.Sleep(time.Millisecond * time.Duration(rand.Int63n(1000)+50))
+		time.Sleep(time.Millisecond * time.Duration(rand.Int63n(100)+50))
 	}
 	h := md5.New()
 	if _, err := io.Copy(h, file); err != nil {

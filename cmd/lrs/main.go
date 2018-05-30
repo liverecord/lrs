@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -134,7 +135,11 @@ func main() {
 	err = godotenv.Load()
 
 	if err != nil {
-		logger.Panic("Error loading .env file")
+		interactiveSetup()
+		err = godotenv.Load()
+		if err != nil {
+			logger.Panicln("Setup failed. Please, create .env file with configuration.")
+		}
 	}
 
 	// open db connection
@@ -225,4 +230,44 @@ func main() {
 	}
 	logger.Printf("Listening on %s", addr)
 
+}
+
+func promptOption(option string) string {
+	fmt.Printf("%s: ", option)
+	var o string
+	_, err := fmt.Scanln(&o)
+	if err != nil {
+		return promptOption(option)
+	}
+	return o
+}
+
+func interactiveSetup() {
+	f, err := os.OpenFile(".env", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		logger.Errorln("Cannot create .env file in this directory")
+		return
+	}
+
+	var options = map[string]string{
+		"DOCUMENT_ROOT":     "Document root",
+		"DOMAIN":            "Domain",
+		"PROTOCOL":          "Default protocol (e.g.: http)",
+		"PORT":              "Default port (e.g.: 80)",
+		"SMTP_HOST":         "SMTP Host (e.g.: smtp.google.com)",
+		"SMTP_PORT":         "SMTP port (e.g.: 25)",
+		"SMTP_USERNAME":     "SMTP username",
+		"SMTP_PASSWORD":     "SMTP password",
+		"SMTP_INSECURE_TLS": "Enable insecure TLS for SMTP (true or false, not recommended in production)?",
+		"SMTP_SSL":          "Use SSL for SMTP (true or false)?",
+		"MYSQL_DSN":         "MySQL database source name (e.g.: root:123@tcp(127.0.0.1:3306)/liveRecord?charset=utf8&parseTime=True)",
+		"LISTEN_ADDR":       "Listen on (e.g.: 127.0.0.1:8000)",
+		"DEBUG":             "Enable debug mode (true or false)?",
+	}
+
+	for k, v := range options {
+		f.Write([]byte(fmt.Sprintf("%s=%s\n", k, promptOption(v))))
+	}
+	f.Close()
+	fmt.Println("All set!")
 }

@@ -78,6 +78,7 @@ func (Ctx *AppContext) CommentList(frame lrs.Frame) {
 				comm.User.Online = commUser.UserOnline
 				comm.User.Picture = commUser.UserPicture
 				comm.User.Rank = commUser.UserRank
+				comm.User = comm.User.SafePluck()
 			}
 
 			if err := Ctx.Db.ScanRows(rows, &commTopic); err == nil {
@@ -98,11 +99,7 @@ func (Ctx *AppContext) CommentList(frame lrs.Frame) {
 			comments = append(comments, comm)
 		}
 		defer rows.Close()
-		// cats, _ := json.Marshal(comments)
-		// Ctx.Ws.WriteJSON(Frame{Type: CommentListFrame, Data: string(cats)})
-
 		Ctx.Pool.Write(Ctx.Ws, lrs.NewFrame(lrs.CommentListFrame, comments, frame.RequestID))
-
 	} else {
 		Ctx.Logger.WithError(err)
 	}

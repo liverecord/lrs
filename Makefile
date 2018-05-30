@@ -11,7 +11,7 @@ clean:
 .PHONY: build test dist it
 
 build:
-	go get -u
+	go get
 	mkdir -p ./bin
 	go build -o ./bin/lrs ./cmd/lrs
 	chmod a+x ./bin/lrs

@@ -18,9 +18,10 @@ func (Ctx *AppContext) Topic(frame server.Frame) {
 		Ctx.Db.
 			Preload("Category").
 			Preload("User").
-			Preload("Acl").
+			Preload("ACL").
 			Where("slug = ?", slug).First(&topic)
 		if topic.ID > 0 {
+			topic.SafeTopic()
 			f := server.NewFrame(server.TopicFrame, topic, frame.RequestID)
 			Ctx.Pool.Write(Ctx.Ws, f)
 			Ctx.CommentList(f)
@@ -79,6 +80,9 @@ func (Ctx *AppContext) TopicList(frame server.Frame) {
 		Offset((page - 1) * 100).
 		Limit(100).
 		Find(&topics)
+	for _, v := range topics {
+		v.SafeTopic()
+	}
 	f := server.NewFrame(server.TopicListFrame, topics, frame.RequestID)
 	Ctx.Pool.Write(Ctx.Ws, f)
 }

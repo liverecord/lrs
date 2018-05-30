@@ -20,7 +20,7 @@ type Topic struct {
 	Title         string   `json:"title"`
 	Body          string   `json:"body,omitempty" sql:"type:longtext"`
 	Order         int      `json:"order"`
-	ACL           []User   `json:"acl,omitempty" gorm:"many2many:topic_acl;association_autoupdate:false;association_autocreate:false"`
+	ACL           []User   `json:"acl" gorm:"many2many:topic_acl;association_autoupdate:false;association_autocreate:false"`
 	TotalViews    uint32   `json:"total_views,omitempty"`
 	TotalComments uint32   `json:"total_comments,omitempty"`
 	Rank          uint32   `json:"rank,omitempty"`
@@ -39,7 +39,12 @@ func makeUniqueSlug(s *string, db *gorm.DB, i uint) {
 
 // BeforeCreate hook
 func (t *Topic) BeforeCreate(scope *gorm.Scope) (err error) {
-	t.Slug = slug.Make(t.Title)
+	t.Title = strings.TrimSpace(t.Title)
+	if len(t.Title) == 0 {
+		t.Slug = "unknown"
+	} else {
+		t.Slug = slug.Make(t.Title)
+	}
 	makeUniqueSlug(&t.Slug, scope.DB(), 0)
 	return
 }
@@ -51,4 +56,17 @@ func (t *Topic) BeforeSave() (err error) {
 	t.Title = common.StripTags(t.Title)
 	t.Body = common.SanitizeHtml(t.Body)
 	return
+}
+
+// SafeTopic returns sanitized version of the topic
+func (t *Topic) SafeTopic() *Topic {
+	if t.ACL == nil {
+		t.ACL = make([]User, 0)
+	} else {
+		for i, u := range t.ACL {
+			t.ACL[i] = u.SafePluck()
+		}
+	}
+	t.User = t.User.SafePluck()
+	return t
 }
