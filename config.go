@@ -23,6 +23,7 @@ type Config struct {
 	UploadDir    string
 	DocumentRoot string
 	SMTP         SMTP `gorm:"embedded;embedded_prefix:smtp_"`
+	Debug		bool
 }
 
 // SiteURL Returns site URL

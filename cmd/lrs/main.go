@@ -202,7 +202,7 @@ func main() {
 		}
 		db.Save(&config)
 	}
-
+	config.Debug = common.BoolEnv("DEBUG", false)
 	cfg = &config
 
 	ticker := time.NewTicker(time.Second)
