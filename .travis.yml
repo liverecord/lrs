@@ -22,15 +22,15 @@ deploy:
   skip_cleanup: true
   file_glob: true
   file:
-    - dist/liverecord-server-alpine-linux-amd64-*.tar.gz
-    - dist/liverecord-server-linux-amd64-*.tar.gz
-    - dist/liverecord-server-linux-i386-*.tar.gz
-    - dist/liverecord-server-linux-armel-*.tar.gz
-    - dist/liverecord-server-linux-armhf-*.tar.gz
-    - dist/liverecord-server-darwin-amd64-*.tar.gz
-    - dist/liverecord-server-darwin-i386-*.tar.gz
-    - dist/liverecord-server-windows-amd64-*.zip
-    - dist/liverecord-server-windows-i386-*.zip
+    - dist/lrs-alpine-linux-amd64-*.tar.gz
+    - dist/lrs-linux-amd64-*.tar.gz
+    - dist/lrs-linux-i386-*.tar.gz
+    - dist/lrs-linux-armel-*.tar.gz
+    - dist/lrs-linux-armhf-*.tar.gz
+    - dist/lrs-darwin-amd64-*.tar.gz
+    - dist/lrs-darwin-i386-*.tar.gz
+    - dist/lrs-windows-amd64-*.zip
+    - dist/lrs-windows-i386-*.zip
   on:
     tags: true
 
