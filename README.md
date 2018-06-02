@@ -1,9 +1,10 @@
 # LiveRecord Server 
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/liverecord/lrs)](https://goreportcard.com/report/github.com/liverecord/lrs)
-[![License](https://img.shields.io/github/license/liverecord/lrs.svg)](https://github.com/liverecord/lrs)
+[![License](https://img.shields.io/github/license/liverecord/lrs.svg)](https://github.com/liverecord/lrs/blob/master/LICENSE)
 [![Build Status](https://travis-ci.org/liverecord/lrs.svg?branch=master)](https://travis-ci.org/liverecord/lrs)
-[![Github All Releases](https://img.shields.io/github/downloads/liverecord/lrs/total.svg)](https://github.com/liverecord/lrs)
+[![Github All Releases](https://img.shields.io/github/release/liverecord/lrs.svg)](https://github.com/liverecord/lrs/releases/latest)
+[![Github All Releases](https://img.shields.io/github/downloads/liverecord/lrs/total.svg)](https://github.com/liverecord/lrs/releases/)
 
 
 This is socket server for LiveRecord communication platform.

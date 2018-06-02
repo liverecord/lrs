@@ -3,14 +3,14 @@ package handlers
 import "github.com/liverecord/lrs"
 
 // CategoryList sends list of categories
-func (Ctx *AppContext) CategoryList(frame lrs.Frame) {
+func (Ctx *ConnCtx) CategoryList(frame lrs.Frame) {
 	var categories []lrs.Category
 	Ctx.Db.Find(&categories)
 	Ctx.Pool.Write(Ctx.Ws, lrs.NewFrame(lrs.CategoryListFrame, categories, frame.RequestID))
 }
 
 // CategorySave saves the category
-func (Ctx *AppContext) CategorySave(frame lrs.Frame) {
+func (Ctx *ConnCtx) CategorySave(frame lrs.Frame) {
 	if Ctx.IsAuthorized() {
 		var category lrs.Category
 		err := frame.BindJSON(&category)

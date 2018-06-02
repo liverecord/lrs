@@ -7,10 +7,11 @@ import (
 	"github.com/jinzhu/gorm"
 
 	server "github.com/liverecord/lrs"
+	"time"
 )
 
 // Topic sends topic data
-func (Ctx *AppContext) Topic(frame server.Frame) {
+func (Ctx *ConnCtx) Topic(frame server.Frame) {
 	var topic server.Topic
 	var data map[string]string
 	frame.BindJSON(&data)
@@ -21,17 +22,32 @@ func (Ctx *AppContext) Topic(frame server.Frame) {
 			Preload("ACL").
 			Where("slug = ?", slug).First(&topic)
 		if topic.ID > 0 {
+			Ctx.ViewTopic(&topic)
 			topic.SafeTopic()
 			f := server.NewFrame(server.TopicFrame, topic, frame.RequestID)
 			Ctx.Pool.Write(Ctx.Ws, f)
 			Ctx.CommentList(f)
-			Ctx.Db.Model(&topic).UpdateColumn("total_views", gorm.Expr("total_views + ?", 1))
+
 		}
 	}
 }
 
+func (Ctx *ConnCtx) ViewTopic(topic *server.Topic) {
+
+	if Ctx.IsAuthorized() {
+		var topicStatus server.TopicStatus
+		now := time.Now()
+		Ctx.Db.
+			Where(server.TopicStatus{UserID: Ctx.User.ID, TopicID: topic.ID}).
+			Assign(server.TopicStatus{ReadAt: &now, NotifiedAt: &now}).
+			FirstOrCreate(&topicStatus)
+	}
+	Ctx.Db.Model(&topic).UpdateColumn("total_views", gorm.Expr("total_views + ?", 1))
+	//Ctx.Db.Model(&topic).UpdateColumn("commented_at", time.Now())
+}
+
 // TopicList returns list of topics
-func (Ctx *AppContext) TopicList(frame server.Frame) {
+func (Ctx *ConnCtx) TopicList(frame server.Frame) {
 	var topics []server.Topic
 	var category server.Category
 	var data map[string]string
@@ -88,7 +104,7 @@ func (Ctx *AppContext) TopicList(frame server.Frame) {
 }
 
 // TopicDelete destroys the topic
-func (Ctx *AppContext) TopicDelete(frame server.Frame) {
+func (Ctx *ConnCtx) TopicDelete(frame server.Frame) {
 	if Ctx.IsAuthorized() {
 		var topic server.Topic
 		err := frame.BindJSON(&topic)
@@ -105,7 +121,7 @@ func (Ctx *AppContext) TopicDelete(frame server.Frame) {
 }
 
 // TopicSave saves the topic
-func (Ctx *AppContext) TopicSave(frame server.Frame) {
+func (Ctx *ConnCtx) TopicSave(frame server.Frame) {
 	if !Ctx.IsAuthorized() {
 		Ctx.Logger.WithField("msg", "Unauthorized topic save call").Info()
 		return

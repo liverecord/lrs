@@ -11,7 +11,7 @@ type SocketStateMap map[*websocket.Conn]bool
 type SocketConnectionsMap map[*websocket.Conn]*User
 
 // UserConnectionsMap type
-type UserConnectionsMap map[uint]SocketStateMap
+type UserConnectionsMap map[uint64]SocketStateMap
 
 // ConnectionPool is intended to keep track of all connections
 type ConnectionPool struct {

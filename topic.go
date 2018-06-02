@@ -7,25 +7,40 @@ import (
 	"github.com/gosimple/slug"
 	"github.com/jinzhu/gorm"
 	"github.com/liverecord/lrs/common"
+	"time"
 )
 
 // Topic defines the main forum topic structure
 type Topic struct {
 	Model
 	Slugged
-	CategoryID    uint     `json:"categoryId"`
-	Category      Category `json:"category,omitempty" gorm:"association_autoupdate:false;association_autocreate:false"`
-	UserID        uint     `json:"userId"`
-	User          User     `json:"user,omitempty" gorm:"association_autoupdate:false;association_autocreate:false"`
-	Title         string   `json:"title"`
-	Body          string   `json:"body,omitempty" sql:"type:longtext"`
-	Order         int      `json:"order"`
-	ACL           []User   `json:"acl" gorm:"many2many:topic_acl;association_autoupdate:false;association_autocreate:false"`
-	TotalViews    uint32   `json:"total_views,omitempty"`
-	TotalComments uint32   `json:"total_comments,omitempty"`
-	Rank          uint32   `json:"rank,omitempty"`
-	Private       bool     `json:"private"`
-	Pinned        bool     `json:"pinned"`
+	CategoryID    uint64    `json:"categoryId"`
+	Category      Category  `json:"category,omitempty" gorm:"association_autoupdate:false;association_autocreate:false"`
+	UserID        uint64    `json:"userId"`
+	User          User      `json:"user,omitempty" gorm:"association_autoupdate:false;association_autocreate:false"`
+	Title         string    `json:"title"`
+	Body          string    `json:"body,omitempty" sql:"type:longtext"`
+	Order         int       `json:"order"`
+	ACL           []User    `json:"acl" gorm:"many2many:topic_acl;association_autoupdate:false;association_autocreate:false"`
+	TotalViews    uint      `json:"total_views,omitempty"`
+	TotalComments uint      `json:"total_comments,omitempty"`
+	CommentedAt   time.Time `json:"commentedAt,omitempty"`
+	Rank          uint      `json:"rank,omitempty"`
+	Private       bool      `json:"private"`
+	Pinned        bool      `json:"pinned"`
+	Spam          bool      `json:"spam"`
+	Moderated     bool      `json:"moderated"`
+}
+
+// TopicStatus keeps track of topic reads, votes, favorites
+type TopicStatus struct {
+	TopicID    uint64     `json:"topicId" gorm:"primary_key;AUTO_INCREMENT:false"`
+	UserID     uint64     `json:"userId" gorm:"primary_key;AUTO_INCREMENT:false"`
+	ReadAt     *time.Time `json:"readAt"`
+	NotifiedAt *time.Time `json:"notifiedAt"`
+	Vote       int        `json:"vote"`
+	Favorite   bool       `json:"favorite"`
+	Block      bool       `json:"block"`
 }
 
 func makeUniqueSlug(s *string, db *gorm.DB, i uint) {

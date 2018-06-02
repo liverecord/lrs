@@ -33,7 +33,7 @@ type UsersSearchRequest struct {
 }
 
 // Auth used to authorized user
-func (Ctx *AppContext) Auth(frame Frame) {
+func (Ctx *ConnCtx) Auth(frame Frame) {
 	var authData UserAuthData
 	frame.BindJSON(&authData)
 	Ctx.Logger.Debugf("AuthData: %v", authData)
@@ -66,7 +66,7 @@ func (Ctx *AppContext) Auth(frame Frame) {
 	}
 }
 
-func (Ctx *AppContext) respondWithToken(user User) {
+func (Ctx *ConnCtx) respondWithToken(user User) {
 	uld, err := Ctx.generateToken(user)
 	if err == nil {
 		Ctx.Pool.Write(Ctx.Ws, NewFrame(AuthFrame, uld, ""))
@@ -75,7 +75,7 @@ func (Ctx *AppContext) respondWithToken(user User) {
 	}
 }
 
-func (Ctx *AppContext) generateToken(user User) (UserLoginData, error) {
+func (Ctx *ConnCtx) generateToken(user User) (UserLoginData, error) {
 	// Create the token
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256,
 		jwt.MapClaims{
@@ -92,7 +92,7 @@ func (Ctx *AppContext) generateToken(user User) (UserLoginData, error) {
 }
 
 // AuthorizeJWT for checking the JWT token
-func (Ctx *AppContext) AuthorizeJWT(tokenString string) {
+func (Ctx *ConnCtx) AuthorizeJWT(tokenString string) {
 
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		// Don't forget to validate the alg is what you expect:
@@ -118,7 +118,7 @@ func (Ctx *AppContext) AuthorizeJWT(tokenString string) {
 
 }
 
-func (Ctx *AppContext) ResetPassword(frame Frame) {
+func (Ctx *ConnCtx) ResetPassword(frame Frame) {
 	if Ctx.IsAuthorized() {
 		return
 	}
@@ -145,7 +145,7 @@ func (Ctx *AppContext) ResetPassword(frame Frame) {
 	Ctx.Pool.Write(Ctx.Ws, NewFrame(ResetPasswordFrame, "ok", frame.RequestID))
 }
 
-func (Ctx *AppContext) UserInfo(frame Frame) {
+func (Ctx *ConnCtx) UserInfo(frame Frame) {
 	var request UserInfoRequest
 	var user User
 	frame.BindJSON(&request)
@@ -155,11 +155,11 @@ func (Ctx *AppContext) UserInfo(frame Frame) {
 	}
 }
 
-func (Ctx *AppContext) IsAuthorized() bool {
+func (Ctx *ConnCtx) IsAuthorized() bool {
 	return Ctx.User != nil && Ctx.User.ID > 0
 }
 
-func (Ctx *AppContext) UserUpdate(frame Frame) {
+func (Ctx *ConnCtx) UserUpdate(frame Frame) {
 	if Ctx.IsAuthorized() {
 		var user User
 		//json.Unmarshal([]byte(frame.Data), &user)
@@ -175,7 +175,7 @@ func (Ctx *AppContext) UserUpdate(frame Frame) {
 	}
 }
 
-func (Ctx *AppContext) UserList(frame Frame) {
+func (Ctx *ConnCtx) UserList(frame Frame) {
 	var request UsersSearchRequest
 	var users []User
 	frame.BindJSON(&request)
@@ -202,7 +202,7 @@ func (Ctx *AppContext) UserList(frame Frame) {
 	}
 }
 
-func (Ctx *AppContext) UserDelete(frame Frame) {
+func (Ctx *ConnCtx) UserDelete(frame Frame) {
 	var user User
 	frame.BindJSON(&user)
 	if Ctx.IsAuthorized() && user.ID == Ctx.User.ID {

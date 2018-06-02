@@ -2,6 +2,7 @@ package lrs
 
 import "encoding/json"
 
+// List of all allowed frames
 const (
 	PingFrame           = "Ping"
 	AuthFrame           = "Auth"
@@ -29,21 +30,24 @@ const (
 	CancelUploadFrame   = "CancelUpload"
 )
 
+// Frame is a core envelop used to encapsulate different data structures
 type Frame struct {
 	Type      string `json:"type"`
 	Data      string `json:"data"`
 	RequestID string `json:"requestId"`
 }
 
+// BindJSON unmarshals JSON to an object
 func (frame Frame) BindJSON(obj interface{}) error {
 	return json.Unmarshal([]byte(frame.Data), obj)
 }
 
-func NewFrame(t string, obj interface{}, requestId string) Frame {
+// NewFrame returns a new Frame given a type, object and request identifier
+func NewFrame(t string, obj interface{}, requestID string) Frame {
 	r, _ := json.Marshal(obj)
 	return Frame{
 		Type:      t,
 		Data:      string(r),
-		RequestID: requestId,
+		RequestID: requestID,
 	}
 }

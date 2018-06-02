@@ -150,6 +150,7 @@ func (u *User) SafePluck() User {
 	return ru
 }
 
+// Map applies given function to list of users and
 func (ul UserList) Map(f func(User) User) UserList {
 	nl := make(UserList, len(ul))
 	for i, v := range ul {
@@ -157,5 +158,3 @@ func (ul UserList) Map(f func(User) User) UserList {
 	}
 	return nl
 }
-
- 

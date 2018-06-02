@@ -8,8 +8,8 @@ import (
 	"github.com/liverecord/lrs"
 )
 
-// AppContext defines current application context
-type AppContext struct {
+// ConnCtx defines current application context
+type ConnCtx struct {
 	Cfg    *lrs.Config
 	Db     *gorm.DB
 	Logger *logrus.Logger
@@ -21,7 +21,7 @@ type AppContext struct {
 
 // ConnectionContext defines current application context
 type ConnectionContext struct {
-	App  *AppContext
+	App  *ConnCtx
 	Ws   *websocket.Conn
 	User *lrs.User
 }

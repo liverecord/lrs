@@ -24,7 +24,6 @@ import (
 var db *gorm.DB
 var cfg *lrs.Config
 var logger *logrus.Logger
-var uploadDir string
 
 func init() {
 	logger = logrus.New()
@@ -60,7 +59,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 	ws.WriteJSON(lrs.NewFrame(lrs.PingFrame, " ", ""))
 
 	// our registry
-	var lr = handlers.AppContext{
+	var lr = handlers.ConnCtx{
 		Db:     db,
 		Cfg:    cfg,
 		Logger: logger,
@@ -161,6 +160,7 @@ func main() {
 	// configure web-server
 	fs := http.FileServer(http.Dir(common.Env("DOCUMENT_ROOT", "assets")))
 	http.Handle("/", fs)
+	http.HandleFunc("/*", handleOauth)
 	http.HandleFunc("/ws", handleConnections)
 	http.HandleFunc("/api/oauth/", handleOauth)
 	http.HandleFunc("/api/oauth/facebook/", handleOauth)
@@ -168,6 +168,7 @@ func main() {
 	db.AutoMigrate(&lrs.Config{})
 	db.AutoMigrate(&lrs.User{})
 	db.AutoMigrate(&lrs.Topic{})
+	db.AutoMigrate(&lrs.TopicStatus{})
 	db.AutoMigrate(&lrs.Comment{})
 	db.AutoMigrate(&lrs.Category{})
 	db.AutoMigrate(&lrs.SocialProfile{})
@@ -224,11 +225,11 @@ func main() {
 	}()
 
 	addr := common.Env("LISTEN_ADDR", "127.0.0.1:8000")
+	logger.Infof("Listening on %s", addr)
 	err = http.ListenAndServe(addr, nil)
 	if err != nil {
 		logger.WithError(err).Panic("Can't bind address & port")
 	}
-	logger.Printf("Listening on %s", addr)
 
 }
 
@@ -243,26 +244,28 @@ func promptOption(option string) string {
 }
 
 func interactiveSetup() {
-	f, err := os.OpenFile(".env", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(".env", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
 		logger.Errorln("Cannot create .env file in this directory")
 		return
 	}
 
 	var options = map[string]string{
-		"DOCUMENT_ROOT":     "Document root",
-		"DOMAIN":            "Domain",
-		"PROTOCOL":          "Default protocol (e.g.: http)",
-		"PORT":              "Default port (e.g.: 80)",
-		"SMTP_HOST":         "SMTP Host (e.g.: smtp.google.com)",
-		"SMTP_PORT":         "SMTP port (e.g.: 25)",
-		"SMTP_USERNAME":     "SMTP username",
-		"SMTP_PASSWORD":     "SMTP password",
-		"SMTP_INSECURE_TLS": "Enable insecure TLS for SMTP (true or false, not recommended in production)?",
-		"SMTP_SSL":          "Use SSL for SMTP (true or false)?",
-		"MYSQL_DSN":         "MySQL database source name (e.g.: root:123@tcp(127.0.0.1:3306)/liveRecord?charset=utf8&parseTime=True)",
-		"LISTEN_ADDR":       "Listen on (e.g.: 127.0.0.1:8000)",
-		"DEBUG":             "Enable debug mode (true or false)?",
+		"DOCUMENT_ROOT":       "Document root",
+		"DOMAIN":              "Domain",
+		"PROTOCOL":            "Default protocol (e.g.: http)",
+		"PORT":                "Default port (e.g.: 80)",
+		"SMTP_HOST":           "SMTP Host (e.g.: smtp.google.com)",
+		"SMTP_PORT":           "SMTP port (e.g.: 25)",
+		"SMTP_USERNAME":       "SMTP username",
+		"SMTP_PASSWORD":       "SMTP password",
+		"SMTP_INSECURE_TLS":   "Enable insecure TLS for SMTP (true or false, not recommended in production)?",
+		"SMTP_SSL":            "Use SSL for SMTP (true or false)?",
+		"MYSQL_DSN":           "MySQL database source name (e.g.: root:123@tcp(127.0.0.1:3306)/liveRecord?charset=utf8&parseTime=True)",
+		"LISTEN_ADDR":         "Listen on (e.g.: 127.0.0.1:8000)",
+		"DEBUG":               "Enable debug mode (true or false)?",
+		"FACEBOOK_APP_ID":     "Facebook Application Id (visit https://developers.facebook.com/ to get one)",
+		"FACEBOOK_APP_SECRET": "Facebook Application Secret",
 	}
 
 	for k, v := range options {

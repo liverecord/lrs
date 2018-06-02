@@ -26,7 +26,7 @@ type File struct {
 }
 
 // Upload Handler
-func (Ctx *AppContext) Upload(frame lrs.Frame) {
+func (Ctx *ConnCtx) Upload(frame lrs.Frame) {
 	var f File
 	frame.BindJSON(&f)
 	fmt.Println(frame, f)
@@ -34,12 +34,12 @@ func (Ctx *AppContext) Upload(frame lrs.Frame) {
 }
 
 // CancelUpload handler
-func (Ctx *AppContext) CancelUpload(frame lrs.Frame) {
+func (Ctx *ConnCtx) CancelUpload(frame lrs.Frame) {
 	Ctx.File = nil
 }
 
 // Uploader reads bytes from socket and writes them into file
-func (Ctx *AppContext) Uploader(reader io.Reader) {
+func (Ctx *ConnCtx) Uploader(reader io.Reader) {
 	if Ctx.File == nil {
 		Ctx.Logger.Println("File is not set")
 		return

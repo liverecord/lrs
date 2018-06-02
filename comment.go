@@ -5,9 +5,9 @@ import "time"
 // Comment on the topic
 type Comment struct {
 	Model
-	TopicID     uint         `json:"topicId" sql:"index"`
+	TopicID     uint64       `json:"topicId" sql:"index"`
 	Topic       Topic        `json:"topic,omitempty" gorm:"association_autoupdate:false;association_autocreate:false"`
-	UserID      uint         `json:"userId" sql:"index"`
+	UserID      uint64       `json:"userId" sql:"index"`
 	User        User         `json:"user" gorm:"association_autoupdate:false;association_autocreate:false"`
 	Body        string       `json:"body" sql:"type:text"`
 	Attachments []Attachment `json:"attachments,omitempty" gorm:"association_autoupdate:false;association_autocreate:false"`
@@ -31,9 +31,9 @@ type Attachment struct {
 // CommentStatus used to track read statuses of comments
 type CommentStatus struct {
 	Model
-	CommentID  uint       `json:"commentId"`
+	CommentID  uint64     `json:"commentId"`
 	Comment    Topic      `json:"comment" gorm:"association_autoupdate:false;association_autocreate:false"`
-	UserID     uint       `json:"userId" sql:"index"`
+	UserID     uint64     `json:"userId" sql:"index"`
 	User       User       `json:"user" gorm:"association_autoupdate:false;association_autocreate:false"`
 	ReadAt     *time.Time `json:"readAt"`
 	NotifiedAt *time.Time `json:"notifiedAt"`

@@ -2,12 +2,11 @@ package handlers
 
 import (
 	"fmt"
-
 	"github.com/liverecord/lrs"
 )
 
 // CommentList returns list of comments
-func (Ctx *AppContext) CommentList(frame lrs.Frame) {
+func (Ctx *ConnCtx) CommentList(frame lrs.Frame) {
 	var comments []lrs.Comment
 	comments = make([]lrs.Comment, 0, 1)
 	var topic lrs.Topic
@@ -47,13 +46,13 @@ func (Ctx *AppContext) CommentList(frame lrs.Frame) {
 	}
 
 	type CommentTopic struct {
-		TopicID    uint
+		TopicID    uint64
 		TopicSlug  string
 		TopicTitle string
 	}
 
 	type CommentCategory struct {
-		CategoryID   uint
+		CategoryID   uint64
 		CategorySlug string
 		CategoryName string
 	}
@@ -106,12 +105,12 @@ func (Ctx *AppContext) CommentList(frame lrs.Frame) {
 }
 
 // BroadcastComment sends comment to topic subscribers
-func (Ctx *AppContext) BroadcastComment() {
+func (Ctx *ConnCtx) BroadcastComment() {
 
 }
 
 // CommentSave saves the comment
-func (Ctx *AppContext) CommentSave(frame lrs.Frame) {
+func (Ctx *ConnCtx) CommentSave(frame lrs.Frame) {
 	if Ctx.IsAuthorized() {
 		var comment lrs.Comment
 		err := frame.BindJSON(&comment)
@@ -140,17 +139,20 @@ func (Ctx *AppContext) CommentSave(frame lrs.Frame) {
 
 					}
 				}
-			}
-			if comment.ID > 0 {
-				Ctx.Logger.WithField("msg", "Comment updates not supported yet").Info()
-			} else {
-				comment.ID = 0
-				fmt.Println(frame.Data)
-				err = Ctx.Db.Set("gorm:association_autoupdate", false).Save(&comment).Error
-				if err == nil {
-					Ctx.Pool.Broadcast(lrs.NewFrame(lrs.CommentSaveFrame, comment, frame.RequestID))
+
+				if comment.ID > 0 {
+					Ctx.Logger.WithField("msg", "Comment updates not supported yet").Info()
+				} else {
+					comment.ID = 0
+					fmt.Println(frame.Data)
+					err = Ctx.Db.Set("gorm:association_autoupdate", false).Save(&comment).Error
+					if err == nil {
+
+						Ctx.Pool.Broadcast(lrs.NewFrame(lrs.CommentSaveFrame, comment, frame.RequestID))
+					}
 				}
 			}
+
 			if err != nil {
 				Ctx.Logger.WithError(err).Error("Unable to save comment")
 			}
