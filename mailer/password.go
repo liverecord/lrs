@@ -69,7 +69,7 @@ func SendPasswordReset(Cfg *lrs.Config, user lrs.User, password string) {
 	}
 	d.SSL = Cfg.SMTP.SSL
 
-	if err := d.DialAndSend(m); err != nil {
+	if err = d.DialAndSend(m); err != nil {
 		panic(err)
 
 	}

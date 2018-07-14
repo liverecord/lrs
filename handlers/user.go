@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -9,7 +8,6 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/dgrijalva/jwt-go"
 	. "github.com/liverecord/lrs"
-	. "github.com/liverecord/lrs/common"
 	"github.com/liverecord/lrs/mailer"
 	"github.com/sethvargo/go-password/password"
 	"golang.org/x/crypto/bcrypt"
@@ -32,52 +30,70 @@ type UsersSearchRequest struct {
 	ExcludeUsers []uint `json:"exclude"`
 }
 
+type ErrorResponse struct {
+	Code int `json:"code"`
+	Message string `json:"message"`
+}
+
+const (
+	// GeneralError test
+	GeneralError = 0
+	// WrongPassword
+	WrongPassword = 1
+	// NoPasswordReset
+	NoPasswordReset = 2
+)
 // Auth used to authorized user
 func (Ctx *ConnCtx) Auth(frame Frame) {
+	if Ctx.IsAuthorized() {
+		Ctx.Logger.Warningf("Authorized authentication, %v", frame)
+		return
+	}
 	var authData UserAuthData
 	frame.BindJSON(&authData)
 	Ctx.Logger.Debugf("AuthData: %v", authData)
 	var user User
 	authData.Email = strings.ToLower(authData.Email)
 	Ctx.Db.Where("email = ?", authData.Email).First(&user)
-	if Ctx.IsAuthorized() {
+	if user.ID > 0 {
 		err := bcrypt.CompareHashAndPassword(
 			S2BA(user.Password),
 			S2BA(authData.Password))
 		if err == nil {
 			// we are cool, password is correct
-			Ctx.respondWithToken(user)
 			Ctx.User = &user
+			Ctx.respondWithToken(user)
 		} else {
-			Ctx.Pool.Write(Ctx.Ws, Frame{Type: AuthErrorFrame, Data: "PasswordMismatch"})
+			Ctx.Pool.Write(Ctx.Ws, NewFrame(AuthErrorFrame, ErrorResponse{Code:WrongPassword, Message: err.Error()}, frame.RequestID))
 			Ctx.Logger.WithError(err).Errorf("Cannot authorize user %s %v", user.Email, err)
 		}
-
-	} else {
-		user.Email = authData.Email
-		user.Name = StripTags(user.MakeNameFromEmail())
-		user.Roles = []Role{}
-		user.MakeSlug()
-		user.SetPassword(authData.Password)
-		user.Picture = user.MakeGravatarPicture()
-		Ctx.Db.Save(&user)
-		Ctx.User = &user
-		Ctx.respondWithToken(user)
+		return
 	}
+	// onboard new user
+	user.Email = authData.Email
+	user.Name = StripTags(user.MakeNameFromEmail())
+	user.Roles = []Role{}
+	user.MakeSlug()
+	user.SetPassword(authData.Password)
+	user.Picture = user.MakeGravatarPicture()
+	Ctx.Db.Save(&user)
+	Ctx.User = &user
+	Ctx.respondWithToken(user)
 }
 
 func (Ctx *ConnCtx) respondWithToken(user User) {
 	uld, err := Ctx.generateToken(user)
 	if err == nil {
 		Ctx.Pool.Write(Ctx.Ws, NewFrame(AuthFrame, uld, ""))
-	} else {
-		Ctx.Logger.WithError(err).Printf("Cannot generate token %v", err)
+		return
 	}
+	Ctx.Logger.WithError(err).Printf("Cannot generate token %v", err)
 }
 
 func (Ctx *ConnCtx) generateToken(user User) (UserLoginData, error) {
 	// Create the token
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256,
+	token := jwt.NewWithClaims(
+		jwt.SigningMethodHS256,
 		jwt.MapClaims{
 			"uid":  user.ID,
 			"hash": user.Hash,
@@ -111,13 +127,12 @@ func (Ctx *ConnCtx) AuthorizeJWT(tokenString string) {
 			Ctx.respondWithToken(user)
 			Ctx.User = &user
 		}
-
-	} else {
-		Ctx.Logger.Error(err)
+		return
 	}
-
+	Ctx.Logger.Error(err)
 }
 
+// ResetPassword Resets user password
 func (Ctx *ConnCtx) ResetPassword(frame Frame) {
 	if Ctx.IsAuthorized() {
 		return
@@ -136,7 +151,6 @@ func (Ctx *ConnCtx) ResetPassword(frame Frame) {
 	if err != nil {
 		Ctx.Logger.WithError(err)
 		Ctx.Pool.Write(Ctx.Ws, NewFrame(ResetPasswordFrame, "error", frame.RequestID))
-
 		return
 	}
 	user.SetPassword(newPassword)
@@ -145,6 +159,7 @@ func (Ctx *ConnCtx) ResetPassword(frame Frame) {
 	Ctx.Pool.Write(Ctx.Ws, NewFrame(ResetPasswordFrame, "ok", frame.RequestID))
 }
 
+// UserInfo returns information about the user
 func (Ctx *ConnCtx) UserInfo(frame Frame) {
 	var request UserInfoRequest
 	var user User
@@ -155,10 +170,12 @@ func (Ctx *ConnCtx) UserInfo(frame Frame) {
 	}
 }
 
+// IsAuthorized checks if connection is authorized
 func (Ctx *ConnCtx) IsAuthorized() bool {
 	return Ctx.User != nil && Ctx.User.ID > 0
 }
 
+// UserUpdate saves user configuration
 func (Ctx *ConnCtx) UserUpdate(frame Frame) {
 	if Ctx.IsAuthorized() {
 		var user User
@@ -175,6 +192,7 @@ func (Ctx *ConnCtx) UserUpdate(frame Frame) {
 	}
 }
 
+// UserList returns users information
 func (Ctx *ConnCtx) UserList(frame Frame) {
 	var request UsersSearchRequest
 	var users []User
@@ -189,19 +207,16 @@ func (Ctx *ConnCtx) UserList(frame Frame) {
 		a = a.Where(" id NOT IN ( ? )", request.ExcludeUsers)
 	}
 	a.Limit(10).Find(&users)
-	if users != nil {
-		for _, u := range users {
-			u = u.SafePluck()
-		}
-		userData, err := json.Marshal(users)
-		if err == nil {
-			Ctx.Pool.Write(Ctx.Ws, Frame{Type: UserListFrame, Data: string(userData)})
-		} else {
-			Ctx.Logger.WithError(err)
-		}
+	if users == nil {
+		return
 	}
+	for _, u := range users {
+		u = u.SafePluck()
+	}
+	Ctx.Pool.Write(Ctx.Ws, NewFrame(UserListFrame, users, frame.RequestID))
 }
 
+// UserDelete removes the user
 func (Ctx *ConnCtx) UserDelete(frame Frame) {
 	var user User
 	frame.BindJSON(&user)

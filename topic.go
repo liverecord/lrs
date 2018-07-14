@@ -24,6 +24,7 @@ type Topic struct {
 	ACL           []User    `json:"acl" gorm:"many2many:topic_acl;association_autoupdate:false;association_autocreate:false"`
 	TotalViews    uint      `json:"total_views,omitempty"`
 	TotalComments uint      `json:"total_comments,omitempty"`
+	UnreadComments uint     `json:"unread_comments,omitempty"`
 	CommentedAt   time.Time `json:"commentedAt,omitempty"`
 	Rank          uint      `json:"rank,omitempty"`
 	Private       bool      `json:"private"`
@@ -68,7 +69,7 @@ func (t *Topic) BeforeCreate(scope *gorm.Scope) (err error) {
 func (t *Topic) BeforeSave() (err error) {
 	t.Title = strings.TrimSpace(t.Title)
 	t.Title = strings.Title(t.Title)
-	t.Title = common.StripTags(t.Title)
+	t.Title = StripTags(t.Title)
 	t.Body = common.SanitizeHtml(t.Body)
 	return
 }

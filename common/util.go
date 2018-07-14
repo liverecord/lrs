@@ -7,9 +7,7 @@ import (
 	"github.com/microcosm-cc/bluemonday"
 )
 
-func S2BA(value string) []byte {
-	return []byte(value)
-}
+
 
 func Env(key, def string) string {
 	val, set := os.LookupEnv(key)
@@ -48,10 +46,6 @@ func IntEnv(key string, def int) int {
 	return intVal
 }
 
-func StripTags(html string) string {
-	p := bluemonday.StripTagsPolicy()
-	return p.Sanitize(html)
-}
 
 func SanitizeHtml(html string) string {
 	p := bluemonday.NewPolicy()

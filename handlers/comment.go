@@ -3,6 +3,9 @@ package handlers
 import (
 	"fmt"
 	"github.com/liverecord/lrs"
+	"strings"
+	"github.com/liverecord/lrs/common"
+	"time"
 )
 
 // CommentList returns list of comments
@@ -111,55 +114,58 @@ func (Ctx *ConnCtx) BroadcastComment() {
 
 // CommentSave saves the comment
 func (Ctx *ConnCtx) CommentSave(frame lrs.Frame) {
-	if Ctx.IsAuthorized() {
-		var comment lrs.Comment
-		err := frame.BindJSON(&comment)
-		Ctx.Logger.Info("Decoded comment", comment)
-		Ctx.Logger.Info("User", Ctx.User)
-		if err == nil {
-			comment.User.ID = Ctx.User.ID
-			comment.User = *Ctx.User
+	if !Ctx.IsAuthorized() {
+		Ctx.Logger.WithField("msg", "Unauthorized comment save call").Info()
+		return
+	}
+	var comment lrs.Comment
+	err := frame.BindJSON(&comment)
+	Ctx.Logger.Info("Decoded comment", comment)
+	Ctx.Logger.Info("User", Ctx.User)
+	if err != nil {
+		Ctx.Logger.WithError(err).Error("can't unmarshall comment")
+		return
+	}
+	comment.User.ID = Ctx.User.ID
+	comment.User = *Ctx.User
 
-			if comment.TopicID > 0 {
-				var topic lrs.Topic
-				Ctx.Db.First(&topic, comment.TopicID)
-				if topic.ID > 0 {
-					Ctx.Logger.Debugf("%v", topic.ACL)
-					if topic.Private {
-						// broadcast only to people from acl or author
-						fr := lrs.NewFrame(lrs.CommentSaveFrame, comment, frame.RequestID)
-						Ctx.Pool.Send(&topic.User, fr)
-						for u := range topic.ACL {
-							Ctx.Pool.Send(&topic.ACL[u], fr)
-						}
+	if comment.TopicID == 0 {
+		return
+	}
+	var topic lrs.Topic
+	Ctx.Db.First(&topic, comment.TopicID)
+	if topic.ID == 0 {
+		return
+	}
+	comment.Body = common.SanitizeHtml(comment.Body)
+	comment.Body = strings.TrimSpace(comment.Body)
+	if len(comment.Body) < 1 {
+		return
+	}
+	if comment.ID > 0 {
+		Ctx.Logger.WithField("msg", "Comment updates not supported yet").Info()
+	} else {
+		comment.ID = 0
+		fmt.Println(frame.Data)
+		err = Ctx.Db.Set("gorm:association_autoupdate", false).Save(&comment).Error
+		if err != nil {
+			return
+		}
+		Ctx.Db.Model(&topic).UpdateColumn("commented_at", time.Now())
 
-					} else {
-						// broadcast to everyone, who has any connection to this topic
-						// find everyone, who viewed or commented this topic
+		Ctx.Pool.Broadcast(lrs.NewFrame(lrs.CommentSaveFrame, comment, frame.RequestID))
+	}
 
-					}
-				}
-
-				if comment.ID > 0 {
-					Ctx.Logger.WithField("msg", "Comment updates not supported yet").Info()
-				} else {
-					comment.ID = 0
-					fmt.Println(frame.Data)
-					err = Ctx.Db.Set("gorm:association_autoupdate", false).Save(&comment).Error
-					if err == nil {
-
-						Ctx.Pool.Broadcast(lrs.NewFrame(lrs.CommentSaveFrame, comment, frame.RequestID))
-					}
-				}
-			}
-
-			if err != nil {
-				Ctx.Logger.WithError(err).Error("Unable to save comment")
-			}
-		} else {
-			Ctx.Logger.WithError(err).Error("can't unmarshall comment")
+	Ctx.Logger.Debugf("%v", topic.ACL)
+	if topic.Private {
+		// broadcast only to people from acl or author
+		fr := lrs.NewFrame(lrs.CommentSaveFrame, comment, frame.RequestID)
+		Ctx.Pool.Send(&topic.User, fr)
+		for u := range topic.ACL {
+			Ctx.Pool.Send(&topic.ACL[u], fr)
 		}
 	} else {
-		Ctx.Logger.WithField("msg", "Unauthorized comment save call").Info()
+		// broadcast to everyone, who has any connection to this topic
+		// find everyone, who viewed or commented this topic
 	}
 }

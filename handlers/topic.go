@@ -49,38 +49,65 @@ func (Ctx *ConnCtx) ViewTopic(topic *server.Topic) {
 // TopicList returns list of topics
 func (Ctx *ConnCtx) TopicList(frame server.Frame) {
 	var topics []server.Topic
-	var category server.Category
 	var data map[string]string
 	page := 0
 	frame.BindJSON(&data)
 	var query *gorm.DB
-	query = Ctx.Db.Preload("Category")
+	query = Ctx.Db.Table("topics t").Unscoped()
 	Ctx.Logger.Println(data)
-	if catSlug, ok := data["category"]; ok {
-		Ctx.Db.Where("slug = ?", catSlug).First(&category)
-		if category.ID > 0 {
-			query = query.Where("category_id = ?", category.ID)
-		}
+	CategoryMissed := true
+	if catSlug, ok := data["category"]; ok && catSlug != "-" && catSlug != "" {
+		query = query.Joins("INNER JOIN categories tc ON (t.category_id = tc.id AND tc.`deleted_at` IS NULL AND tc.slug = ?)", catSlug)
+		CategoryMissed = false
 	}
+	if CategoryMissed  {
+		query = query.Joins("INNER JOIN categories tc ON (t.category_id = tc.id AND tc.`deleted_at` IS NULL)")
+	}
+	UserID := uint64(0)
+	if Ctx.User != nil && Ctx.User.ID > 0 {
+		UserID = Ctx.User.ID
+		query = query.
+			Joins("LEFT JOIN topic_acl tacl ON (t.id = tacl.topic_id)").
+			Where("t.private = 0 OR t.private IS NULL OR t.user_id = ? OR tacl.user_id = ?", UserID, UserID)
+	} else {
+		query = query.Where("t.private = 0 OR t.private IS NULL")
+	}
+
 	if searchTerm, ok := data["term"]; ok {
 		if len(searchTerm) > 1 {
 			query = query.
 				Where(
-					"title LIKE ? OR body LIKE ?",
+					"t.title LIKE ? OR t.body LIKE ?",
 					fmt.Sprint("%", searchTerm, "%"),
 					fmt.Sprint("%", searchTerm, "%"),
 				)
 		}
 	}
+
 	if section, ok := data["section"]; ok {
 		switch section {
 		case "newTopics":
+			query = query.
+				Joins("LEFT JOIN topic_statuses ts ON (t.id = ts.topic_id AND ts.user_id = ? )", UserID)
 		case "recentlyViewed":
+			query = query.
+				Joins("INNER JOIN topic_statuses ts ON (t.id = ts.topic_id AND ts.user_id = ? )", UserID)
 		case "participated":
+			// ORDER BY unread_comments DESC
+			query = query.Where("cmts.user_id = ?", UserID).
+				Joins("INNER JOIN topic_statuses ts ON (t.id = ts.topic_id AND ts.user_id = ? )", UserID)
 		case "bookmarks":
-
+			// ts.vote = 1
+			query = query.
+				Joins("INNER JOIN topic_statuses ts ON (t.id = ts.topic_id AND ts.user_id = ? )", UserID).
+				Where("ts.vote = ?", 1)
 		}
 	}
+
+	query = query.
+		Joins("LEFT JOIN comments cmts ON " +
+		"(t.id = cmts.topic_id AND	cmts.`deleted_at` IS NULL AND cmts.`spam` = 0 AND (cmts.`created_at` > ts.read_at OR ts.`read_at` is null))	").
+		Where("t.`deleted_at` IS NULL")
 
 	if rp, ok := data["page"]; ok {
 		page, _ := strconv.Atoi(rp)
@@ -91,8 +118,16 @@ func (Ctx *ConnCtx) TopicList(frame server.Frame) {
 
 	query.
 		Preload("User").
-		//Select("id,title,slug,created_at,updated_at,category_id").
-		Order("updated_at DESC,created_at DESC").
+		Preload("Category").
+		Select(
+			"t.id, t.title, t.slug, t.category_id, t.user_id, cmts.id, "+
+				"t.created_at, t.updated_at, t.rank, t.pinned, t.total_views, t.total_comments, " +
+			"ts.vote, ts.favorite," +
+			"tc.slug category_slug, tc.name category_name," +
+			"COUNT(cmts.id) as unread_comments",
+		).
+		Group("t.id").
+		Order("t.updated_at DESC, t.created_at DESC").
 		Offset((page - 1) * 100).
 		Limit(100).
 		Find(&topics)

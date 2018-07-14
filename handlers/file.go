@@ -17,12 +17,14 @@ import (
 
 // File stucture defines upload
 type File struct {
-	Name         string    `json:"name"`
-	Size         int       `json:"size"`
-	Uploaded     int       `json:"uploaded"`
-	Type         string    `json:"type"`
-	LastModified time.Time `json:"lastModifiedDate"`
-	PublicPath   string    `json:"path"`
+	Name          string    `json:"name"`
+	Size          int       `json:"size"`
+	Uploaded      int       `json:"uploaded"`
+	Loaded        int       `json:"loaded"`
+	Type          string    `json:"type"`
+	LastModified  time.Time `json:"lastModifiedDate"`
+	UploadStarted time.Time `json:"uploadStartedDate"`
+	PublicPath    string    `json:"path"`
 }
 
 // Upload Handler
@@ -30,6 +32,7 @@ func (Ctx *ConnCtx) Upload(frame lrs.Frame) {
 	var f File
 	frame.BindJSON(&f)
 	fmt.Println(frame, f)
+	f.UploadStarted = time.Now().UTC()
 	Ctx.File = &f
 }
 

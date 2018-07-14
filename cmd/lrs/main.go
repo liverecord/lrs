@@ -96,22 +96,22 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 				// we drop this connection because Frames must be parsable
 				pool.DropConnection(ws)
 				break
-			} else {
-				logger.Debugf("Frame: %v", f)
-
-				// We use reflection to call methods
-				// Method name must match Frame.Type
-				lrv := reflect.ValueOf(&lr)
-				frv := reflect.ValueOf(f)
-				method := lrv.MethodByName(f.Type)
-				if method.IsValid() &&
-					method.Type().NumIn() == 1 &&
-					method.Type().In(0).AssignableTo(reflect.TypeOf(lrs.Frame{})) {
-					method.Call([]reflect.Value{frv})
-				} else {
-					lr.Logger.Errorf("method %s is invalid", f.Type)
-				}
 			}
+			logger.Debugf("Frame: %v", f)
+
+			// We use reflection to call methods
+			// Method name must match Frame.Type
+			lrv := reflect.ValueOf(&lr)
+			frv := reflect.ValueOf(f)
+			method := lrv.MethodByName(f.Type)
+			if method.IsValid() &&
+				method.Type().NumIn() == 1 &&
+				method.Type().In(0).AssignableTo(reflect.TypeOf(lrs.Frame{})) {
+				method.Call([]reflect.Value{frv})
+			} else {
+				lr.Logger.Errorf("method %s is invalid", f.Type)
+			}
+
 		case websocket.BinaryMessage:
 			if lr.IsAuthorized() {
 				lr.Uploader(reader)
@@ -127,6 +127,55 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 
 func handleOauth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Location", "/")
+}
+
+func handleStaticRequest(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("Location", "/")
+}
+
+func migrate(db *gorm.DB) {
+	db.AutoMigrate(&lrs.Config{})
+	db.AutoMigrate(&lrs.User{})
+	db.AutoMigrate(&lrs.Topic{})
+	db.AutoMigrate(&lrs.TopicStatus{})
+	db.AutoMigrate(&lrs.Comment{})
+	db.AutoMigrate(&lrs.Category{})
+	db.AutoMigrate(&lrs.SocialProfile{})
+	db.AutoMigrate(&lrs.Role{})
+	db.AutoMigrate(&lrs.CommentStatus{})
+	db.AutoMigrate(&lrs.Device{})
+	db.AutoMigrate(&lrs.Settings{})
+	db.AutoMigrate(&lrs.Attachment{})
+}
+
+func configure(db *gorm.DB) *lrs.Config {
+	var config lrs.Config
+	var err error
+	db.First(&config)
+	if config.ID == 0 {
+		// lets set this application with default parameters
+		config.JwtSignature = make([]byte, 256)
+		if _, err = io.ReadFull(rand.Reader, config.JwtSignature); err != nil {
+			logger.WithError(err).Errorln("Unable to generate JWT Signature")
+		}
+		config.DocumentRoot = common.Env("DOCUMENT_ROOT", "assets")
+		config.Domain = common.Env("DOMAIN", "localhost")
+		config.Protocol = common.Env("PROTOCOL", "http")
+		config.Port = uint(common.IntEnv("PORT", 80))
+		config.SMTP.Host = common.Env("SMTP_HOST", "localhost")
+		config.SMTP.Port = common.IntEnv("SMTP_PORT", 25)
+		config.SMTP.Username = common.Env("SMTP_USERNAME", "")
+		config.SMTP.Password = common.Env("SMTP_PASSWORD", "")
+		config.SMTP.InsecureTLS = common.BoolEnv("SMTP_INSECURE_TLS", false)
+		config.SMTP.SSL = common.BoolEnv("SMTP_SSL", false)
+		config.UploadDir, err = ioutil.TempDir("/tmp", "lr_")
+		if err != nil {
+			logger.WithError(err).Errorln("Unable to create temporary dir. Is '/tmp' writable?")
+		}
+		db.Save(&config)
+	}
+	config.Debug = common.BoolEnv("DEBUG", false)
+	return &config
 }
 
 func main() {
@@ -158,56 +207,17 @@ func main() {
 	}
 
 	// configure web-server
+	// http.HandleFunc("/", handleStaticRequest)
 	fs := http.FileServer(http.Dir(common.Env("DOCUMENT_ROOT", "assets")))
 	http.Handle("/", fs)
-	http.HandleFunc("/*", handleOauth)
 	http.HandleFunc("/ws", handleConnections)
 	http.HandleFunc("/api/oauth/", handleOauth)
 	http.HandleFunc("/api/oauth/facebook/", handleOauth)
 
-	db.AutoMigrate(&lrs.Config{})
-	db.AutoMigrate(&lrs.User{})
-	db.AutoMigrate(&lrs.Topic{})
-	db.AutoMigrate(&lrs.TopicStatus{})
-	db.AutoMigrate(&lrs.Comment{})
-	db.AutoMigrate(&lrs.Category{})
-	db.AutoMigrate(&lrs.SocialProfile{})
-	db.AutoMigrate(&lrs.Role{})
-	db.AutoMigrate(&lrs.CommentStatus{})
-	db.AutoMigrate(&lrs.Device{})
-	db.AutoMigrate(&lrs.Settings{})
-	db.AutoMigrate(&lrs.Attachment{})
-
-	var config lrs.Config
-	db.First(&config)
-
-	if config.ID == 0 {
-		// lets set this application with default parameters
-		config.JwtSignature = make([]byte, 256)
-		if _, err = io.ReadFull(rand.Reader, config.JwtSignature); err != nil {
-			logger.WithError(err).Errorln("Unable to generate JWT Signature")
-		}
-		config.DocumentRoot = common.Env("DOCUMENT_ROOT", "assets")
-		config.Domain = common.Env("DOMAIN", "localhost")
-		config.Protocol = common.Env("PROTOCOL", "http")
-		config.Port = uint(common.IntEnv("PORT", 80))
-		config.SMTP.Host = common.Env("SMTP_HOST", "localhost")
-		config.SMTP.Port = common.IntEnv("SMTP_PORT", 25)
-		config.SMTP.Username = common.Env("SMTP_USERNAME", "")
-		config.SMTP.Password = common.Env("SMTP_PASSWORD", "")
-		config.SMTP.InsecureTLS = common.BoolEnv("SMTP_INSECURE_TLS", false)
-		config.SMTP.SSL = common.BoolEnv("SMTP_SSL", false)
-		config.UploadDir, err = ioutil.TempDir("/tmp", "lr_")
-		if err != nil {
-			logger.WithError(err).Errorln("Unable to create temporary dir. Is '/tmp' writable?")
-		}
-		db.Save(&config)
-	}
-	config.Debug = common.BoolEnv("DEBUG", false)
-	cfg = &config
+	migrate(db)
+	cfg = configure(db)
 
 	ticker := time.NewTicker(time.Second)
-
 	go func() {
 		for _ = range ticker.C {
 			/*
@@ -230,7 +240,6 @@ func main() {
 	if err != nil {
 		logger.WithError(err).Panic("Can't bind address & port")
 	}
-
 }
 
 func promptOption(option string) string {
@@ -244,12 +253,6 @@ func promptOption(option string) string {
 }
 
 func interactiveSetup() {
-	f, err := os.OpenFile(".env", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
-	if err != nil {
-		logger.Errorln("Cannot create .env file in this directory")
-		return
-	}
-
 	var options = map[string]string{
 		"DOCUMENT_ROOT":       "Document root",
 		"DOMAIN":              "Domain",
@@ -268,6 +271,11 @@ func interactiveSetup() {
 		"FACEBOOK_APP_SECRET": "Facebook Application Secret",
 	}
 
+	f, err := os.OpenFile(".env", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	if err != nil {
+		logger.Errorln("Cannot create .env file in this directory")
+		return
+	}
 	for k, v := range options {
 		f.Write([]byte(fmt.Sprintf("%s=%s\n", k, promptOption(v))))
 	}
