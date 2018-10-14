@@ -91,6 +91,7 @@ type UserAuthData struct {
 	RememberMe bool   `json:"rememberMe"`
 }
 
+// returns a string for a given length
 func randomString(l uint8) string {
 	b := make([]byte, l)
 	rand.Read(b)

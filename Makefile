@@ -8,7 +8,8 @@ default:
 	make it
 
 clean:
-	rm ./server
+	if [ -f ./server ]; then rm ./server ; fi ;
+	if [ -f ./bin/lrs ]; then rm ./bin/lrs ; fi ;
 
 .PHONY: build test dist it
 

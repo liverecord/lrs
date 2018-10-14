@@ -7,8 +7,6 @@ import (
 	"github.com/microcosm-cc/bluemonday"
 )
 
-
-
 func Env(key, def string) string {
 	val, set := os.LookupEnv(key)
 	if set {
@@ -46,14 +44,13 @@ func IntEnv(key string, def int) int {
 	return intVal
 }
 
-
 func SanitizeHtml(html string) string {
 	p := bluemonday.NewPolicy()
 	p.AllowImages()
 	p.AllowLists()
 	p.AllowTables()
 	p.AllowAttrs("cite").OnElements("blockquote")
-	p.AllowElements("br", "hr", "p", "span", "code", "kbd", "sub", "sup", "b", "i", "u", "strong", "em")
+	p.AllowElements("br", "hr", "p", "pre", "span", "code", "kbd", "sub", "sup", "b", "i", "u", "strong", "em")
 
 	p.AllowAttrs("href").OnElements("a")
 	p.AllowAttrs("src").OnElements("video")

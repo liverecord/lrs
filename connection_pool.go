@@ -2,7 +2,8 @@ package lrs
 
 import (
 	"github.com/gorilla/websocket"
-)
+	"sync"
+	)
 
 // SocketStateMap type
 type SocketStateMap map[*websocket.Conn]bool
@@ -18,6 +19,7 @@ type ConnectionPool struct {
 	Sockets SocketConnectionsMap
 	Users   UserConnectionsMap
 	outbox  map[*websocket.Conn]chan Frame
+	sync.Mutex
 }
 
 // NewConnectionPool is factory to create new pool of connections
@@ -31,13 +33,17 @@ func NewConnectionPool() *ConnectionPool {
 
 // AddConnection adds connection to the pool
 func (pool *ConnectionPool) AddConnection(conn *websocket.Conn) {
+	pool.Lock()
 	pool.Sockets[conn] = nil
 	pool.outbox[conn] = make(chan Frame)
+	pool.Unlock()
 	go pool.dispatch(conn)
 }
 
 // Authenticate binds user identifier to a connection
 func (pool *ConnectionPool) Authenticate(conn *websocket.Conn, user *User) {
+	pool.Lock()
+	defer pool.Unlock()
 	pool.Sockets[conn] = user
 	if _, ok := pool.Users[user.ID]; !ok {
 		pool.Users[user.ID] = make(SocketStateMap)
@@ -45,8 +51,10 @@ func (pool *ConnectionPool) Authenticate(conn *websocket.Conn, user *User) {
 	pool.Users[user.ID][conn] = true
 }
 
-// Logout disaccosiates users and connections
+// Logout disassociates users and connections
 func (pool *ConnectionPool) Logout(user *User) {
+	pool.Lock()
+	defer pool.Unlock()
 	for conn := range pool.Users[user.ID] {
 		pool.Sockets[conn] = nil
 		delete(pool.Users[pool.Sockets[conn].ID], conn)
@@ -55,6 +63,8 @@ func (pool *ConnectionPool) Logout(user *User) {
 
 // DropConnection closes connection
 func (pool *ConnectionPool) DropConnection(conn *websocket.Conn) {
+	pool.Lock()
+	defer pool.Unlock()
 	if pool.Sockets[conn] != nil {
 		delete(pool.Users[pool.Sockets[conn].ID], conn)
 	}
@@ -67,9 +77,11 @@ func (pool *ConnectionPool) DropConnection(conn *websocket.Conn) {
 }
 
 // Broadcast sends a frame to all connections
-func (pool *ConnectionPool) Broadcast(frame Frame) {
+func (pool *ConnectionPool) Broadcast(frame Frame, skipConn *websocket.Conn) {
 	for conn := range pool.Sockets {
-		pool.Write(conn, frame)
+		if conn != skipConn {
+			pool.Write(conn, frame)
+		}
 	}
 }
 
@@ -92,6 +104,7 @@ func (pool *ConnectionPool) Send(to *User, frame Frame) {
 // actually sends frames
 func (pool *ConnectionPool) dispatch(c *websocket.Conn) {
 	for f := range pool.outbox[c] {
+		// time.Sleep(200 * time.Millisecond)
 		err := c.WriteJSON(&f)
 		if err != nil {
 			pool.DropConnection(c)

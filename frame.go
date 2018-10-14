@@ -24,10 +24,12 @@ const (
 	CommentFrame        = "Comment"
 	CommentListFrame    = "CommentList"
 	CommentSaveFrame    = "CommentSave"
+	CommentTypingFrame  = "CommentTyping"
 	UserFrame           = "User"
 	ResetPasswordFrame  = "ResetPassword"
 	FileUploadFrame     = "Upload"
 	CancelUploadFrame   = "CancelUpload"
+	ErrorFrame          = "Error"
 )
 
 // Frame is a core envelop used to encapsulate different data structures

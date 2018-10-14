@@ -6,13 +6,12 @@ import (
 
 	"github.com/jinzhu/gorm"
 
-	server "github.com/liverecord/lrs"
-	"time"
+	lrs "github.com/liverecord/lrs"
 )
 
 // Topic sends topic data
-func (Ctx *ConnCtx) Topic(frame server.Frame) {
-	var topic server.Topic
+func (Ctx *ConnCtx) Topic(frame lrs.Frame) {
+	var topic lrs.Topic
 	var data map[string]string
 	frame.BindJSON(&data)
 	if slug, ok := data["slug"]; ok {
@@ -22,33 +21,39 @@ func (Ctx *ConnCtx) Topic(frame server.Frame) {
 			Preload("ACL").
 			Where("slug = ?", slug).First(&topic)
 		if topic.ID > 0 {
-			Ctx.ViewTopic(&topic)
-			topic.SafeTopic()
-			f := server.NewFrame(server.TopicFrame, topic, frame.RequestID)
+			if topic.IsAccessibleBy(Ctx.User) {
+				Ctx.ViewTopic(&topic)
+				topic.SafeTopic()
+				f := lrs.NewFrame(lrs.TopicFrame, topic, frame.RequestID)
+				Ctx.Pool.Write(Ctx.Ws, f)
+				creq := lrs.CommentListRequest{TopicID: topic.ID, Page: 1}
+				f = lrs.NewFrame(lrs.TopicFrame, creq, frame.RequestID)
+				Ctx.CommentList(f)
+			} else {
+				f := lrs.NewFrame(lrs.ErrorFrame, lrs.ErrorResponse{Code: lrs.TopicNotAccessible}, frame.RequestID)
+				Ctx.Pool.Write(Ctx.Ws, f)
+			}
+		} else {
+			f := lrs.NewFrame(lrs.ErrorFrame, lrs.ErrorResponse{Code: lrs.TopicNotFound}, frame.RequestID)
 			Ctx.Pool.Write(Ctx.Ws, f)
-			Ctx.CommentList(f)
-
 		}
 	}
 }
 
-func (Ctx *ConnCtx) ViewTopic(topic *server.Topic) {
-
+// ViewTopic registers the view of the topic
+func (Ctx *ConnCtx) ViewTopic(topic *lrs.Topic) {
 	if Ctx.IsAuthorized() {
-		var topicStatus server.TopicStatus
-		now := time.Now()
-		Ctx.Db.
-			Where(server.TopicStatus{UserID: Ctx.User.ID, TopicID: topic.ID}).
-			Assign(server.TopicStatus{ReadAt: &now, NotifiedAt: &now}).
-			FirstOrCreate(&topicStatus)
+		topic.MarkAsRead(Ctx.Db, Ctx.User)
 	}
-	Ctx.Db.Model(&topic).UpdateColumn("total_views", gorm.Expr("total_views + ?", 1))
-	//Ctx.Db.Model(&topic).UpdateColumn("commented_at", time.Now())
+	Ctx.Db.
+		Set("gorm:association_autoupdate", false).
+		Model(&topic).
+		UpdateColumn("total_views", gorm.Expr("total_views + ?", 1))
 }
 
 // TopicList returns list of topics
-func (Ctx *ConnCtx) TopicList(frame server.Frame) {
-	var topics []server.Topic
+func (Ctx *ConnCtx) TopicList(frame lrs.Frame) {
+	var topics []lrs.Topic
 	var data map[string]string
 	page := 0
 	frame.BindJSON(&data)
@@ -60,7 +65,7 @@ func (Ctx *ConnCtx) TopicList(frame server.Frame) {
 		query = query.Joins("INNER JOIN categories tc ON (t.category_id = tc.id AND tc.`deleted_at` IS NULL AND tc.slug = ?)", catSlug)
 		CategoryMissed = false
 	}
-	if CategoryMissed  {
+	if CategoryMissed {
 		query = query.Joins("INNER JOIN categories tc ON (t.category_id = tc.id AND tc.`deleted_at` IS NULL)")
 	}
 	UserID := uint64(0)
@@ -106,7 +111,7 @@ func (Ctx *ConnCtx) TopicList(frame server.Frame) {
 
 	query = query.
 		Joins("LEFT JOIN comments cmts ON " +
-		"(t.id = cmts.topic_id AND	cmts.`deleted_at` IS NULL AND cmts.`spam` = 0 AND (cmts.`created_at` > ts.read_at OR ts.`read_at` is null))	").
+			"(t.id = cmts.topic_id AND	cmts.`deleted_at` IS NULL AND cmts.`spam` = 0 AND (cmts.`created_at` > ts.read_at OR ts.`read_at` is null))	").
 		Where("t.`deleted_at` IS NULL")
 
 	if rp, ok := data["page"]; ok {
@@ -120,11 +125,11 @@ func (Ctx *ConnCtx) TopicList(frame server.Frame) {
 		Preload("User").
 		Preload("Category").
 		Select(
-			"t.id, t.title, t.slug, t.category_id, t.user_id, cmts.id, "+
-				"t.created_at, t.updated_at, t.rank, t.pinned, t.total_views, t.total_comments, " +
-			"ts.vote, ts.favorite," +
-			"tc.slug category_slug, tc.name category_name," +
-			"COUNT(cmts.id) as unread_comments",
+			"t.id, t.title, t.slug, t.category_id, t.user_id, cmts.id, " +
+				"t.created_at, t.updated_at, t.rank, t.pinned, t.private, t.total_views, t.total_comments, " +
+				"ts.vote, ts.favorite," +
+				"tc.slug category_slug, tc.name category_name," +
+				"COUNT(cmts.id) as unread_comments",
 		).
 		Group("t.id").
 		Order("t.updated_at DESC, t.created_at DESC").
@@ -134,18 +139,18 @@ func (Ctx *ConnCtx) TopicList(frame server.Frame) {
 	for _, v := range topics {
 		v.SafeTopic()
 	}
-	f := server.NewFrame(server.TopicListFrame, topics, frame.RequestID)
+	f := lrs.NewFrame(lrs.TopicListFrame, topics, frame.RequestID)
 	Ctx.Pool.Write(Ctx.Ws, f)
 }
 
 // TopicDelete destroys the topic
-func (Ctx *ConnCtx) TopicDelete(frame server.Frame) {
+func (Ctx *ConnCtx) TopicDelete(frame lrs.Frame) {
 	if Ctx.IsAuthorized() {
-		var topic server.Topic
+		var topic lrs.Topic
 		err := frame.BindJSON(&topic)
 		if err == nil {
 			if topic.ID > 0 {
-				var found server.Topic
+				var found lrs.Topic
 				Ctx.Db.First(&found, topic.ID)
 				if found.ID > 0 && found.User.ID == Ctx.User.ID {
 					Ctx.Db.Delete(found)
@@ -156,12 +161,12 @@ func (Ctx *ConnCtx) TopicDelete(frame server.Frame) {
 }
 
 // TopicSave saves the topic
-func (Ctx *ConnCtx) TopicSave(frame server.Frame) {
+func (Ctx *ConnCtx) TopicSave(frame lrs.Frame) {
 	if !Ctx.IsAuthorized() {
 		Ctx.Logger.WithField("msg", "Unauthorized topic save call").Info()
 		return
 	}
-	var topic server.Topic
+	var topic lrs.Topic
 	err := frame.BindJSON(&topic)
 	Ctx.Logger.Info("Decoded topic", topic)
 	Ctx.Logger.Info("User", Ctx.User)
@@ -172,17 +177,23 @@ func (Ctx *ConnCtx) TopicSave(frame server.Frame) {
 	topic.Private = len(topic.ACL) > 0
 	if topic.ID > 0 {
 		// find topic in DB and update it
-		var oldTopic server.Topic
-		Ctx.Db.Where("id = ?", topic.ID).First(&oldTopic)
+		var oldTopic lrs.Topic
+		Ctx.Db.
+			Preload("Users").
+			Where("id = ?", topic.ID).First(&oldTopic)
 		if oldTopic.ID > 0 {
 			oldTopic.Title = topic.Title
 			oldTopic.ACL = topic.ACL
 			oldTopic.Body = topic.Body
-			err = Ctx.Db.Set("gorm:association_autoupdate", false).Save(&oldTopic).Error
-			f := server.NewFrame(server.TopicSaveFrame, topic, frame.RequestID)
+			err = Ctx.Db.
+				Set("gorm:association_autoupdate", false).
+				Set("gorm:association_save_reference", true).
+				Save(&oldTopic).Error
+			Ctx.Db.Model(&oldTopic).Association("ACL").Replace(topic.ACL)
+			f := lrs.NewFrame(lrs.TopicSaveFrame, topic, frame.RequestID)
 			Ctx.Pool.Write(Ctx.Ws, f)
 			if topic.Private == false {
-				Ctx.Pool.Broadcast(server.NewFrame(server.TopicSaveFrame, topic, ""))
+				Ctx.Pool.Broadcast(lrs.NewFrame(lrs.TopicSaveFrame, topic, ""), nil)
 			}
 		}
 	} else {
@@ -192,10 +203,10 @@ func (Ctx *ConnCtx) TopicSave(frame server.Frame) {
 		//topic.
 		fmt.Println(frame.Data)
 		err = Ctx.Db.Set("gorm:association_autoupdate", false).Save(&topic).Error
-		f := server.NewFrame(server.TopicSaveFrame, topic, frame.RequestID)
+		f := lrs.NewFrame(lrs.TopicSaveFrame, topic, frame.RequestID)
 		Ctx.Pool.Write(Ctx.Ws, f)
 		if topic.Private == false {
-			Ctx.Pool.Broadcast(server.NewFrame(server.TopicSaveFrame, topic, ""))
+			Ctx.Pool.Broadcast(lrs.NewFrame(lrs.TopicSaveFrame, topic, ""), nil)
 		}
 	}
 	if err != nil {

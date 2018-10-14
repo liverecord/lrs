@@ -30,19 +30,6 @@ type UsersSearchRequest struct {
 	ExcludeUsers []uint `json:"exclude"`
 }
 
-type ErrorResponse struct {
-	Code int `json:"code"`
-	Message string `json:"message"`
-}
-
-const (
-	// GeneralError test
-	GeneralError = 0
-	// WrongPassword
-	WrongPassword = 1
-	// NoPasswordReset
-	NoPasswordReset = 2
-)
 // Auth used to authorized user
 func (Ctx *ConnCtx) Auth(frame Frame) {
 	if Ctx.IsAuthorized() {
@@ -64,7 +51,7 @@ func (Ctx *ConnCtx) Auth(frame Frame) {
 			Ctx.User = &user
 			Ctx.respondWithToken(user)
 		} else {
-			Ctx.Pool.Write(Ctx.Ws, NewFrame(AuthErrorFrame, ErrorResponse{Code:WrongPassword, Message: err.Error()}, frame.RequestID))
+			Ctx.Pool.Write(Ctx.Ws, NewFrame(AuthErrorFrame, ErrorResponse{Code: WrongPassword, Message: err.Error()}, frame.RequestID))
 			Ctx.Logger.WithError(err).Errorf("Cannot authorize user %s %v", user.Email, err)
 		}
 		return

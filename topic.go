@@ -14,23 +14,24 @@ import (
 type Topic struct {
 	Model
 	Slugged
-	CategoryID    uint64    `json:"categoryId"`
-	Category      Category  `json:"category,omitempty" gorm:"association_autoupdate:false;association_autocreate:false"`
-	UserID        uint64    `json:"userId"`
-	User          User      `json:"user,omitempty" gorm:"association_autoupdate:false;association_autocreate:false"`
-	Title         string    `json:"title"`
-	Body          string    `json:"body,omitempty" sql:"type:longtext"`
-	Order         int       `json:"order"`
-	ACL           []User    `json:"acl" gorm:"many2many:topic_acl;association_autoupdate:false;association_autocreate:false"`
-	TotalViews    uint      `json:"total_views,omitempty"`
-	TotalComments uint      `json:"total_comments,omitempty"`
-	UnreadComments uint     `json:"unread_comments,omitempty"`
-	CommentedAt   time.Time `json:"commentedAt,omitempty"`
-	Rank          uint      `json:"rank,omitempty"`
-	Private       bool      `json:"private"`
-	Pinned        bool      `json:"pinned"`
-	Spam          bool      `json:"spam"`
-	Moderated     bool      `json:"moderated"`
+	CategoryID     uint64    `json:"categoryId"`
+	Category       Category  `json:"category,omitempty" gorm:"association_autoupdate:false;association_autocreate:false"`
+	UserID         uint64    `json:"userId"`
+	User           User      `json:"user,omitempty" gorm:"association_autoupdate:false;association_autocreate:false"`
+	Title          string    `json:"title"`
+	Body           string    `json:"body,omitempty" sql:"type:longtext"`
+	Order          int       `json:"order"`
+	ACL            []User    `json:"acl" gorm:"many2many:topic_acl;association_autoupdate:false;association_autocreate:false;association_save_reference:true"`
+	TotalViews     uint      `json:"total_views,omitempty"`
+	TotalComments  uint      `json:"total_comments,omitempty"`
+	UnreadComments uint      `json:"unread_comments,omitempty" sql:"-"`
+	CommentedAt    time.Time `json:"commentedAt,omitempty"`
+	ReadAt    	  *time.Time `json:"readAt,omitempty" sql:"-"`
+	Rank           uint      `json:"rank,omitempty"`
+	Private        bool      `json:"private"`
+	Pinned         bool      `json:"pinned"`
+	Spam           bool      `json:"spam"`
+	Moderated      bool      `json:"moderated"`
 }
 
 // TopicStatus keeps track of topic reads, votes, favorites
@@ -39,7 +40,7 @@ type TopicStatus struct {
 	UserID     uint64     `json:"userId" gorm:"primary_key;AUTO_INCREMENT:false"`
 	ReadAt     *time.Time `json:"readAt"`
 	NotifiedAt *time.Time `json:"notifiedAt"`
-	Vote       int        `json:"vote"`
+	Vote       int8       `json:"vote"`
 	Favorite   bool       `json:"favorite"`
 	Block      bool       `json:"block"`
 }
@@ -85,4 +86,42 @@ func (t *Topic) SafeTopic() *Topic {
 	}
 	t.User = t.User.SafePluck()
 	return t
+}
+
+// IsAccessibleBy checks whether topic is accessible by User
+func (t *Topic) IsAccessibleBy(u *User) bool {
+	if t.Private == false {
+		return true
+	}
+	if t.User.ID == u.ID {
+		return true
+	}
+	for _, tu := range t.ACL {
+		if tu.ID == u.ID {
+			return true
+		}
+	}
+	return false
+}
+
+// MarkAsRead marks topic as read
+func (t *Topic) MarkAsRead(Db *gorm.DB, u *User) {
+	if u.ID == 0 {
+		return
+	}
+	topicStatus := TopicStatus{UserID: u.ID, TopicID: t.ID}
+	now := time.Now()
+	r := Db.
+		Where(TopicStatus{UserID: u.ID, TopicID: t.ID}).
+		First(&topicStatus)
+	if r.RecordNotFound() {
+		topicStatus.ReadAt = &now
+		topicStatus.NotifiedAt = &now
+		Db.Model(topicStatus).Create(&topicStatus)
+	} else {
+		topicStatus.ReadAt = &now
+		topicStatus.NotifiedAt = &now
+		t.ReadAt = topicStatus.ReadAt
+		Db.Model(topicStatus).Update(&topicStatus)
+	}
 }

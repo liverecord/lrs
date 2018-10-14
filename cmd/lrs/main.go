@@ -209,13 +209,16 @@ func main() {
 	// configure web-server
 	// http.HandleFunc("/", handleStaticRequest)
 	fs := http.FileServer(http.Dir(common.Env("DOCUMENT_ROOT", "assets")))
-	http.Handle("/", fs)
+	http.Handle("/files/", fs)
+	http.Handle("/app-dist/", fs)
 	http.HandleFunc("/ws", handleConnections)
 	http.HandleFunc("/api/oauth/", handleOauth)
 	http.HandleFunc("/api/oauth/facebook/", handleOauth)
 
 	migrate(db)
 	cfg = configure(db)
+
+	lrs.RegisterStaticHandlers(cfg, db)
 
 	ticker := time.NewTicker(time.Second)
 	go func() {

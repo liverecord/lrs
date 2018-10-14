@@ -39,3 +39,24 @@ type CommentStatus struct {
 	NotifiedAt *time.Time `json:"notifiedAt"`
 	Vote       int        `json:"vote"`
 }
+
+// CommentListRequest requests new list with comments
+type CommentListRequest struct {
+	TopicID uint64 `json:"topicId"`
+	Page    uint `json:"page"`
+}
+
+// Pagination object holds data about currently active Page
+// Total number of records and Limit of items per page
+type Pagination struct {
+	Page  uint `json:"page"`
+	Total uint `json:"total"`
+	Limit uint `json:"limit"`
+}
+
+// CommentListResponse returns list of topics
+type CommentListResponse struct {
+	TopicID    uint64 `json:"topicId"`
+	Comments   []Comment `json:"comments"`
+	Pagination Pagination `json:"pagination"`
+}
