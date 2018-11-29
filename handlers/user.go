@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/dgrijalva/jwt-go"
 	. "github.com/liverecord/lrs"
 	"github.com/liverecord/lrs/mailer"

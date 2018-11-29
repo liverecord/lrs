@@ -3,7 +3,7 @@ package lrs
 import (
 	"crypto/rand"
 	"fmt"
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/jinzhu/gorm"
 	"github.com/liverecord/lrs/common"
 	"io"
