@@ -27,7 +27,7 @@ type Config struct {
 	ID                  uint   `gorm:"primary_key" json:"id"`
 	JwtSignature        []byte `gorm:"type:varbinary(256)" json:"-"`
 	Protocol            string
-	Port                uint 	`gorm:"default:80"`
+	Port                uint `gorm:"default:80"`
 	Name                string
 	Domain              string
 	LogoPath            string
@@ -51,8 +51,8 @@ type Config struct {
 	GoogleCMAPIKey      string
 	VapidPublicKey      string
 	VapidPrivateKey     string `json:"-"`
-	CommentsPerPage     uint `json:"commentsPerPage" gorm:"default:100"`
-	TopicsPerPage     	uint `json:"topicsPerPage" gorm:"default:100"`
+	CommentsPerPage     uint   `json:"commentsPerPage" gorm:"default:100"`
+	TopicsPerPage       uint   `json:"topicsPerPage" gorm:"default:100"`
 }
 
 // SiteURL Returns site URL
@@ -65,6 +65,7 @@ func (cfg *Config) LogoURL() string {
 	return cfg.Protocol + "://" + cfg.Domain + "/" + cfg.LogoPath
 }
 
+// NewConfig instantiates Config
 func NewConfig(db *gorm.DB, logger *logrus.Logger) *Config {
 	var config Config
 	var err error
@@ -96,42 +97,41 @@ func NewConfig(db *gorm.DB, logger *logrus.Logger) *Config {
 
 	return &config
 }
+
+// Line identifies one prompt line for .env parameters
 type Line struct {
-	n string
-	t string
-	d string
+	param        string
+	tip          string
+	defaultValue string
 }
 
 func promptOption(option Line) string {
-	fmt.Printf("%s", option.t)
-	if len(option.d) > 0 {
-		fmt.Printf(" (default: %s)", option.d)
+	fmt.Printf("\n%s", option.tip)
+	if len(option.defaultValue) > 0 {
+		fmt.Printf(" (default: %s)", option.defaultValue)
 	}
 	fmt.Print(": ")
 	var o string
 	n, err := fmt.Scanln(&o)
 	if err != nil {
 		if n == 0 {
-			fmt.Println("Used default value", option.d, "for", option.n)
-			return option.d
+			fmt.Printf("Used default value for %s parameter.", option.param)
+			return option.defaultValue
 		}
-
 		return promptOption(option)
 	}
 	return o
 }
 
-
-
 // InteractiveSetup provides user-friendly way to create configuration
 func InteractiveSetup(logger *logrus.Logger) {
 	fmt.Println("Welcome to LiveRecord interactive setup.")
-	cwd, _ :=os.Getwd()
+	cwd, _ := os.Getwd()
 	var options = []Line{
 		{"DOCUMENT_ROOT", "Document root", cwd},
-		{"DOMAIN", "Public App Domain (e.g.: example.com)","localhost"},
-		{"PROTOCOL","Public Protocol","http"},
-		{"PORT","Public Port", "80"},
+		{"DOMAIN", "Public App Domain (e.g.: example.com)", "localhost"},
+		{"PROTOCOL", "Public Protocol", "http"},
+		{"PORT", "Public Port", "80"},
 		{"SMTP_HOST", "SMTP Host", "smtp.google.com"},
 		{"SMTP_PORT", "SMTP Port", "25"},
 		{"SMTP_USERNAME", "SMTP Username (e.g.: someone@gmail.com)", ""},
@@ -151,7 +151,7 @@ func InteractiveSetup(logger *logrus.Logger) {
 		return
 	}
 	for _, v := range options {
-		f.Write([]byte(fmt.Sprintf("%s=%s\n", v.n, promptOption(v))))
+		f.Write([]byte(fmt.Sprintf("%s=%s\n", v.param, promptOption(v))))
 	}
 	f.Close()
 	fmt.Println("All set! Reloading configuration...")
