@@ -1,5 +1,16 @@
 package lrs
 
+import (
+	"crypto/rand"
+	"fmt"
+	"github.com/Sirupsen/logrus"
+	"github.com/jinzhu/gorm"
+	"github.com/liverecord/lrs/common"
+	"io"
+	"io/ioutil"
+	"os"
+)
+
 // SMTP used to define SMTP configuration
 type SMTP struct {
 	From        string
@@ -52,4 +63,96 @@ func (cfg *Config) SiteURL() string {
 // LogoURL returns link to the logo
 func (cfg *Config) LogoURL() string {
 	return cfg.Protocol + "://" + cfg.Domain + "/" + cfg.LogoPath
+}
+
+func NewConfig(db *gorm.DB, logger *logrus.Logger) *Config {
+	var config Config
+	var err error
+
+	db.First(&config)
+	if config.ID == 0 {
+		// lets set this application with default parameters
+		config.JwtSignature = make([]byte, 256)
+		if _, err = io.ReadFull(rand.Reader, config.JwtSignature); err != nil {
+			logger.WithError(err).Errorln("Unable to generate JWT Signature")
+		}
+		config.DocumentRoot = common.Env("DOCUMENT_ROOT", "assets")
+		config.Domain = common.Env("DOMAIN", "localhost")
+		config.Protocol = common.Env("PROTOCOL", "http")
+		config.Port = uint(common.IntEnv("PORT", 80))
+		config.SMTP.Host = common.Env("SMTP_HOST", "localhost")
+		config.SMTP.Port = common.IntEnv("SMTP_PORT", 25)
+		config.SMTP.Username = common.Env("SMTP_USERNAME", "")
+		config.SMTP.Password = common.Env("SMTP_PASSWORD", "")
+		config.SMTP.InsecureTLS = common.BoolEnv("SMTP_INSECURE_TLS", false)
+		config.SMTP.SSL = common.BoolEnv("SMTP_SSL", false)
+		config.UploadDir, err = ioutil.TempDir("/tmp", "lr_")
+		if err != nil {
+			logger.WithError(err).Errorln("Unable to create temporary dir. Is '/tmp' writable?")
+		}
+		db.Save(&config)
+	}
+	config.Debug = common.BoolEnv("DEBUG", false)
+
+	return &config
+}
+type Line struct {
+	n string
+	t string
+	d string
+}
+
+func promptOption(option Line) string {
+	fmt.Printf("%s", option.t)
+	if len(option.d) > 0 {
+		fmt.Printf(" (default: %s)", option.d)
+	}
+	fmt.Print(": ")
+	var o string
+	n, err := fmt.Scanln(&o)
+	if err != nil {
+		if n == 0 {
+			fmt.Println("Used default value", option.d, "for", option.n)
+			return option.d
+		}
+
+		return promptOption(option)
+	}
+	return o
+}
+
+
+
+// InteractiveSetup provides user-friendly way to create configuration
+func InteractiveSetup(logger *logrus.Logger) {
+	fmt.Println("Welcome to LiveRecord interactive setup.")
+	cwd, _ :=os.Getwd()
+	var options = []Line{
+		{"DOCUMENT_ROOT", "Document root", cwd},
+		{"DOMAIN", "Public App Domain (e.g.: example.com)","localhost"},
+		{"PROTOCOL","Public Protocol","http"},
+		{"PORT","Public Port", "80"},
+		{"SMTP_HOST", "SMTP Host", "smtp.google.com"},
+		{"SMTP_PORT", "SMTP Port", "25"},
+		{"SMTP_USERNAME", "SMTP Username (e.g.: someone@gmail.com)", ""},
+		{"SMTP_PASSWORD", "SMTP Password", ""},
+		{"SMTP_INSECURE_TLS", "Enable insecure TLS for SMTP (true or false, not recommended in production)?", "false"},
+		{"SMTP_SSL", "Use SSL for SMTP (true or false)?", "true"},
+		{"MYSQL_DSN", "MySQL database source name", "root:123@tcp(127.0.0.1:3306)/liveRecord?charset=utf8&parseTime=True"},
+		{"LISTEN_ADDR", "Listen on host:port", "127.0.0.1:8000"},
+		{"DEBUG", "Enable debug mode (true or false)?", "false"},
+		{"FACEBOOK_APP_ID", "Facebook Application Id (visit https://developers.facebook.com/ to get one)", ""},
+		{"FACEBOOK_APP_SECRET", "Facebook Application Secret", ""},
+	}
+
+	f, err := os.OpenFile(".env", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	if err != nil {
+		logger.Errorln("Cannot create .env file in this directory")
+		return
+	}
+	for _, v := range options {
+		f.Write([]byte(fmt.Sprintf("%s=%s\n", v.n, promptOption(v))))
+	}
+	f.Close()
+	fmt.Println("All set! Reloading configuration...")
 }

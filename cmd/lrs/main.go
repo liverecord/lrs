@@ -1,11 +1,7 @@
 package main
 
 import (
-	"crypto/rand"
 	"encoding/json"
-	"fmt"
-	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"reflect"
@@ -148,43 +144,22 @@ func migrate(db *gorm.DB) {
 	db.AutoMigrate(&lrs.Attachment{})
 }
 
-func configure(db *gorm.DB) *lrs.Config {
-	var config lrs.Config
-	var err error
-	db.First(&config)
-	if config.ID == 0 {
-		// lets set this application with default parameters
-		config.JwtSignature = make([]byte, 256)
-		if _, err = io.ReadFull(rand.Reader, config.JwtSignature); err != nil {
-			logger.WithError(err).Errorln("Unable to generate JWT Signature")
-		}
-		config.DocumentRoot = common.Env("DOCUMENT_ROOT", "assets")
-		config.Domain = common.Env("DOMAIN", "localhost")
-		config.Protocol = common.Env("PROTOCOL", "http")
-		config.Port = uint(common.IntEnv("PORT", 80))
-		config.SMTP.Host = common.Env("SMTP_HOST", "localhost")
-		config.SMTP.Port = common.IntEnv("SMTP_PORT", 25)
-		config.SMTP.Username = common.Env("SMTP_USERNAME", "")
-		config.SMTP.Password = common.Env("SMTP_PASSWORD", "")
-		config.SMTP.InsecureTLS = common.BoolEnv("SMTP_INSECURE_TLS", false)
-		config.SMTP.SSL = common.BoolEnv("SMTP_SSL", false)
-		config.UploadDir, err = ioutil.TempDir("/tmp", "lr_")
-		if err != nil {
-			logger.WithError(err).Errorln("Unable to create temporary dir. Is '/tmp' writable?")
-		}
-		db.Save(&config)
-	}
-	config.Debug = common.BoolEnv("DEBUG", false)
-	return &config
-}
-
 func main() {
+	logger.Infof("LiveRecord version 0.0.1")
+	dotfile := ".env"
+	for i, v := range os.Args {
+		if (v == "--config" || v == "-c") && i < len(os.Args) - 1 {
+			dotfile = (os.Args)[i + 1]
+			break
+		}
+	}
+
 	var err error
-	err = godotenv.Load()
+	err = godotenv.Load(dotfile)
 
 	if err != nil {
-		interactiveSetup()
-		err = godotenv.Load()
+		lrs.InteractiveSetup(logger)
+		err = godotenv.Load(dotfile)
 		if err != nil {
 			logger.Panicln("Setup failed. Please, create .env file with configuration.")
 		}
@@ -216,7 +191,7 @@ func main() {
 	http.HandleFunc("/api/oauth/facebook/", handleOauth)
 
 	migrate(db)
-	cfg = configure(db)
+	cfg = lrs.NewConfig(db, logger)
 
 	lrs.RegisterStaticHandlers(cfg, db)
 
@@ -243,45 +218,4 @@ func main() {
 	if err != nil {
 		logger.WithError(err).Panic("Can't bind address & port")
 	}
-}
-
-func promptOption(option string) string {
-	fmt.Printf("%s: ", option)
-	var o string
-	_, err := fmt.Scanln(&o)
-	if err != nil {
-		return promptOption(option)
-	}
-	return o
-}
-
-func interactiveSetup() {
-	var options = map[string]string{
-		"DOCUMENT_ROOT":       "Document root",
-		"DOMAIN":              "Domain",
-		"PROTOCOL":            "Default protocol (e.g.: http)",
-		"PORT":                "Default port (e.g.: 80)",
-		"SMTP_HOST":           "SMTP Host (e.g.: smtp.google.com)",
-		"SMTP_PORT":           "SMTP port (e.g.: 25)",
-		"SMTP_USERNAME":       "SMTP username",
-		"SMTP_PASSWORD":       "SMTP password",
-		"SMTP_INSECURE_TLS":   "Enable insecure TLS for SMTP (true or false, not recommended in production)?",
-		"SMTP_SSL":            "Use SSL for SMTP (true or false)?",
-		"MYSQL_DSN":           "MySQL database source name (e.g.: root:123@tcp(127.0.0.1:3306)/liveRecord?charset=utf8&parseTime=True)",
-		"LISTEN_ADDR":         "Listen on (e.g.: 127.0.0.1:8000)",
-		"DEBUG":               "Enable debug mode (true or false)?",
-		"FACEBOOK_APP_ID":     "Facebook Application Id (visit https://developers.facebook.com/ to get one)",
-		"FACEBOOK_APP_SECRET": "Facebook Application Secret",
-	}
-
-	f, err := os.OpenFile(".env", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
-	if err != nil {
-		logger.Errorln("Cannot create .env file in this directory")
-		return
-	}
-	for k, v := range options {
-		f.Write([]byte(fmt.Sprintf("%s=%s\n", k, promptOption(v))))
-	}
-	f.Close()
-	fmt.Println("All set!")
 }
