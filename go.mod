@@ -30,6 +30,7 @@ require (
 	github.com/olekukonko/tablewriter v0.0.1 // indirect
 	github.com/rainycape/unidecode v0.0.0-20150907023854-cb7f23ec59be // indirect
 	github.com/sethvargo/go-password v0.1.2
+	github.com/shurcooL/sanitized_anchor_name v0.0.0-20170918181015-86672fcb3f95 // indirect
 	github.com/sirupsen/logrus v1.2.0
 	github.com/ssor/bom v0.0.0-20170718123548-6386211fdfcf // indirect
 	github.com/zoonman/gravatar v0.0.0-20180204165248-425d0fea1b45
@@ -38,5 +39,8 @@ require (
 	google.golang.org/appengine v1.3.0 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
+	gopkg.in/russross/blackfriday.v2 v2.0.1 // indirect
 	gopkg.in/yaml.v2 v2.2.1 // indirect
 )
+
+replace gopkg.in/russross/blackfriday.v2 => github.com/russross/blackfriday v2.0.0+incompatible
