@@ -10,6 +10,9 @@ import (
 	"time"
 )
 
+// UNKNOWN_SLUG is a default slug for empty title topics
+const UNKNOWN_SLUG  = "unknown"
+
 // Topic defines the main forum topic structure
 type Topic struct {
 	Model
@@ -32,6 +35,8 @@ type Topic struct {
 	Pinned         bool      `json:"pinned"`
 	Spam           bool      `json:"spam"`
 	Moderated      bool      `json:"moderated"`
+	Draft      	   bool      `json:"draft"`
+	ReadOnly       bool      `json:"read_only"`
 }
 
 // TopicStatus keeps track of topic reads, votes, favorites
@@ -58,7 +63,7 @@ func makeUniqueSlug(s *string, db *gorm.DB, i uint) {
 func (t *Topic) BeforeCreate(scope *gorm.Scope) (err error) {
 	t.Title = strings.TrimSpace(t.Title)
 	if len(t.Title) == 0 {
-		t.Slug = "unknown"
+		t.Slug = UNKNOWN_SLUG
 	} else {
 		t.Slug = slug.Make(t.Title)
 	}
