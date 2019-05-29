@@ -3,9 +3,8 @@ package lrs
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"github.com/jinzhu/gorm"
-	"github.com/liverecord/lrs/common"
+	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -66,13 +65,20 @@ func isSlashRune(r rune) bool { return r == '/' || r == '\\' }
 func serveVFS(w http.ResponseWriter, r *http.Request) {
 
 }
-func handleDynamicContent(cfg *Config, db *gorm.DB) func(w http.ResponseWriter, r *http.Request) {
+
+func handleDynamicContent(cfg *Config, db *gorm.DB, logger *logrus.Logger) func(w http.ResponseWriter, r *http.Request) {
 	// read file
-	shtml, _ := ioutil.ReadFile(path.Join(common.Env("DOCUMENT_ROOT", "assets"), "/app-dist/index.html"))
+	shtml, err := ioutil.ReadFile(path.Join(cfg.DocumentRoot, "app-dist/index.html"))
+	logger.Info(shtml)
+
+	if err != nil {
+		logger.WithError(err)
+	}
 	cfgJson, _ := json.Marshal(cfg)
 	cfgJson = bytes.Join([][]byte{S2BA("liveRecordConfig = "), cfgJson, S2BA(";//")}, S2BA(" "))
 
 	return func(w http.ResponseWriter, r *http.Request) {
+		logger.Infof("%s %s", r.Method, r.RequestURI)
 		// serve it
 		html := bytes.Replace(
 			shtml,
@@ -86,20 +92,22 @@ func handleDynamicContent(cfg *Config, db *gorm.DB) func(w http.ResponseWriter, 
 			upath = "/" + upath
 			r.URL.Path = upath
 		}
-		fmt.Println(r.URL.Path)
-
 		if containsDotDot(r.URL.Path) {
 			w.WriteHeader(404)
 			w.Write(html)
 			return
 		}
 		elements := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+		logger.Infof("%v", elements)
 		if len(elements[0]) == 0 || elements[0] == "index.html" {
 			w.WriteHeader(200)
-			w.Write(html)
+			_, err = w.Write(html)
+			logger.WithError(err)
 			return
 		}
-		fname := path.Join(cfg.DocumentRoot, "app-dist", path.Clean(upath))
+		fname := path.Join(cfg.DocumentRoot, path.Clean(upath))
+		logger.Info(fname)
+
 		f, err := os.Open(fname)
 		if err != nil {
 			switch len(elements) {
@@ -153,6 +161,6 @@ func handleDynamicContent(cfg *Config, db *gorm.DB) func(w http.ResponseWriter, 
 }
 
 //RegisterStaticHandlers registers handlers to serve static content
-func RegisterStaticHandlers(cfg *Config, db *gorm.DB) {
-	http.HandleFunc("/", handleDynamicContent(cfg, db))
+func RegisterStaticHandlers(cfg *Config, db *gorm.DB, logger *logrus.Logger) {
+	http.HandleFunc("/", handleDynamicContent(cfg, db, logger))
 }

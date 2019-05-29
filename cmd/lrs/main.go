@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"path/filepath"
 	"reflect"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/gorilla/websocket"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
@@ -15,6 +15,7 @@ import (
 	"github.com/liverecord/lrs"
 	"github.com/liverecord/lrs/common"
 	"github.com/liverecord/lrs/handlers"
+	"github.com/sirupsen/logrus"
 )
 
 var db *gorm.DB
@@ -146,20 +147,22 @@ func migrate(db *gorm.DB) {
 
 func main() {
 	logger.Infof("LiveRecord version 0.0.1")
-	dotfile := ".env"
+	currentDir, _ := filepath.Abs(filepath.Dir(os.Args[0]))
+	logger.Infof("Started in %s", currentDir)
+	dotFile := ".env"
 	for i, v := range os.Args {
 		if (v == "--config" || v == "-c") && i < len(os.Args) - 1 {
-			dotfile = (os.Args)[i + 1]
+			dotFile = (os.Args)[i + 1]
 			break
 		}
 	}
 
 	var err error
-	err = godotenv.Load(dotfile)
+	err = godotenv.Load(dotFile)
 
 	if err != nil {
 		lrs.InteractiveSetup(logger)
-		err = godotenv.Load(dotfile)
+		err = godotenv.Load(dotFile)
 		if err != nil {
 			logger.Panicln("Setup failed. Please, create .env file with configuration.")
 		}
@@ -181,19 +184,20 @@ func main() {
 		logger.SetLevel(logrus.DebugLevel)
 	}
 
+	migrate(db)
+	cfg = lrs.NewConfig(db, logger)
+
 	// configure web-server
 	// http.HandleFunc("/", handleStaticRequest)
-	fs := http.FileServer(http.Dir(common.Env("DOCUMENT_ROOT", "assets")))
+	fs := http.FileServer(http.Dir(cfg.DocumentRoot))
 	http.Handle("/files/", fs)
 	http.Handle("/app-dist/", fs)
 	http.HandleFunc("/ws", handleConnections)
 	http.HandleFunc("/api/oauth/", handleOauth)
 	http.HandleFunc("/api/oauth/facebook/", handleOauth)
 
-	migrate(db)
-	cfg = lrs.NewConfig(db, logger)
 
-	lrs.RegisterStaticHandlers(cfg, db)
+	lrs.RegisterStaticHandlers(cfg, db, logger)
 
 	ticker := time.NewTicker(time.Second)
 	go func() {
