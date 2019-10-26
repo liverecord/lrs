@@ -53,10 +53,13 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 	// Register our new client
 	pool.AddConnection(ws)
 
-	ws.WriteJSON(lrs.NewFrame(lrs.PingFrame, " ", ""))
+	err = ws.WriteJSON(lrs.NewFrame(lrs.PingFrame, " ", ""))
+	if err != nil {
+		logger.WithError(err).Error("Cannot send Ping's reply")
+	}
 
-	// our registry
-	var lr = handlers.ConnCtx{
+	// create our connection context
+	var connCtx = handlers.ConnCtx{
 		Db:     db,
 		Cfg:    cfg,
 		Logger: logger,
@@ -65,9 +68,9 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(jwt) > 0 {
-		lr.AuthorizeJWT(jwt)
-		if lr.IsAuthorized() {
-			pool.Authenticate(ws, lr.User)
+		connCtx.AuthorizeJWT(jwt)
+		if connCtx.IsAuthorized() {
+			pool.Authenticate(ws, connCtx.User)
 		}
 	}
 	// The Magic Frame router
@@ -98,7 +101,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 
 			// We use reflection to call methods
 			// Method name must match Frame.Type
-			lrv := reflect.ValueOf(&lr)
+			lrv := reflect.ValueOf(&connCtx)
 			frv := reflect.ValueOf(f)
 			method := lrv.MethodByName(f.Type)
 			if method.IsValid() &&
@@ -106,14 +109,14 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 				method.Type().In(0).AssignableTo(reflect.TypeOf(lrs.Frame{})) {
 				method.Call([]reflect.Value{frv})
 			} else {
-				lr.Logger.Errorf("method %s is invalid", f.Type)
+				connCtx.Logger.Errorf("method %s is invalid", f.Type)
 			}
 
 		case websocket.BinaryMessage:
-			if lr.IsAuthorized() {
-				lr.Uploader(reader)
+			if connCtx.IsAuthorized() {
+				connCtx.Uploader(reader)
 			} else {
-				lr.Logger.Errorln("Unauthorized upload from", ws.RemoteAddr())
+				connCtx.Logger.Errorln("Unauthorized upload from", ws.RemoteAddr())
 			}
 		case websocket.CloseMessage:
 			pool.DropConnection(ws)

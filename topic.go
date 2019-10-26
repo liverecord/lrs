@@ -25,9 +25,9 @@ type Topic struct {
 	Body           string    `json:"body,omitempty" sql:"type:longtext"`
 	Order          int       `json:"order"`
 	ACL            []User    `json:"acl" gorm:"many2many:topic_acl;association_autoupdate:false;association_autocreate:false;association_save_reference:true"`
-	TotalViews     uint      `json:"total_views,omitempty"`
-	TotalComments  uint      `json:"total_comments,omitempty"`
-	UnreadComments uint      `json:"unread_comments,omitempty" sql:"-"`
+	TotalViews     uint      `json:"totalViews,omitempty"`
+	TotalComments  uint      `json:"totalComments,omitempty"`
+	UnreadComments uint      `json:"unreadComments,omitempty" sql:"-"`
 	CommentedAt    time.Time `json:"commentedAt,omitempty"`
 	ReadAt    	  *time.Time `json:"readAt,omitempty" sql:"-"`
 	Rank           uint      `json:"rank,omitempty"`
@@ -36,7 +36,7 @@ type Topic struct {
 	Spam           bool      `json:"spam"`
 	Moderated      bool      `json:"moderated"`
 	Draft      	   bool      `json:"draft"`
-	ReadOnly       bool      `json:"read_only"`
+	ReadOnly       bool      `json:"readOnly"`
 }
 
 // TopicStatus keeps track of topic reads, votes, favorites

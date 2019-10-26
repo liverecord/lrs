@@ -56,7 +56,11 @@ func (Ctx *ConnCtx) TopicList(frame lrs.Frame) {
 	var topics []lrs.Topic
 	var data map[string]string
 	page := 0
-	frame.BindJSON(&data)
+	err := frame.BindJSON(&data)
+	if err != nil {
+		Ctx.Logger.WithError(err)
+		return
+	}
 	var query *gorm.DB
 	query = Ctx.Db.Table("topics t").Unscoped()
 	Ctx.Logger.Println(data)

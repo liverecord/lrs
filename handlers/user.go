@@ -127,8 +127,11 @@ func (Ctx *ConnCtx) ResetPassword(frame Frame) {
 	// generate bad ass password
 	var user User
 	var email string
-	frame.BindJSON(&email)
-
+	err := frame.BindJSON(&email)
+	if err != nil {
+		Ctx.Logger.WithError(err)
+		return
+	}
 	Ctx.Db.Where("email = ?", email).First(&user)
 	if user.ID == 0 {
 		Ctx.Pool.Write(Ctx.Ws, NewFrame(ResetPasswordFrame, "missing", frame.RequestID))
@@ -150,7 +153,11 @@ func (Ctx *ConnCtx) ResetPassword(frame Frame) {
 func (Ctx *ConnCtx) UserInfo(frame Frame) {
 	var request UserInfoRequest
 	var user User
-	frame.BindJSON(&request)
+	err := frame.BindJSON(&request)
+	if err != nil {
+		Ctx.Logger.WithError(err)
+		return
+	}
 	Ctx.Db.Where("id = ? OR slug = ?", request.Slug, request.Slug).First(&user)
 	if user.ID > 0 {
 		Ctx.Pool.Write(Ctx.Ws, NewFrame(UserInfoFrame, user, frame.RequestID))
@@ -164,18 +171,27 @@ func (Ctx *ConnCtx) IsAuthorized() bool {
 
 // UserUpdate saves user configuration
 func (Ctx *ConnCtx) UserUpdate(frame Frame) {
-	if Ctx.IsAuthorized() {
-		var user User
-		//json.Unmarshal([]byte(frame.Data), &user)
-		frame.BindJSON(&user)
-		if Ctx.User.ID == user.ID {
-			Ctx.Db.First(Ctx.User)
-			Ctx.User.Email = user.Email
-			Ctx.User.Name = user.Name
-			Ctx.User.Gender = user.Gender
-			Ctx.Db.Save(Ctx.User)
-			Ctx.respondWithToken(*Ctx.User)
-		}
+	if !Ctx.IsAuthorized() {
+		Ctx.Logger.Error("Unauthorized Update")
+		return
+	}
+
+	var newUser User
+	err := frame.BindJSON(&newUser)
+	if err != nil {
+		Ctx.Logger.WithError(err)
+		return
+	}
+	Ctx.Logger.WithField("user", newUser).Debug("User update")
+	if Ctx.User.ID == newUser.ID {
+		Ctx.Db.First(Ctx.User)
+		Ctx.User.Email = newUser.Email
+		Ctx.User.Name = newUser.Name
+		Ctx.User.Gender = newUser.Gender
+		Ctx.User.About = newUser.About
+		Ctx.User.Settings = newUser.Settings
+		Ctx.Db.Save(Ctx.User)
+		Ctx.respondWithToken(*Ctx.User)
 	}
 }
 
@@ -183,7 +199,11 @@ func (Ctx *ConnCtx) UserUpdate(frame Frame) {
 func (Ctx *ConnCtx) UserList(frame Frame) {
 	var request UsersSearchRequest
 	var users []User
-	frame.BindJSON(&request)
+	err := frame.BindJSON(&request)
+	if err != nil {
+		Ctx.Logger.WithError(err)
+		return
+	}
 	a := Ctx.Db.Where(
 		"name LIKE ? OR slug = ? OR email LIKE ? ",
 		request.Term+"%",
@@ -206,7 +226,11 @@ func (Ctx *ConnCtx) UserList(frame Frame) {
 // UserDelete removes the user
 func (Ctx *ConnCtx) UserDelete(frame Frame) {
 	var user User
-	frame.BindJSON(&user)
+	err := frame.BindJSON(&user)
+	if err != nil {
+		Ctx.Logger.WithError(err)
+		return
+	}
 	if Ctx.IsAuthorized() && user.ID == Ctx.User.ID {
 		Ctx.Db.Delete(&user)
 	}

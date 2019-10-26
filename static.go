@@ -66,8 +66,18 @@ func serveVFS(w http.ResponseWriter, r *http.Request) {
 
 }
 
+
+func respond(w http.ResponseWriter, logger *logrus.Logger, code int, html []byte) {
+	w.WriteHeader(404)
+	_, err := w.Write(html)
+	if err != nil {
+		logger.WithError(err)
+	}
+}
+
 func handleDynamicContent(cfg *Config, db *gorm.DB, logger *logrus.Logger) func(w http.ResponseWriter, r *http.Request) {
 	// read file
+
 	shtml, err := ioutil.ReadFile(path.Join(cfg.DocumentRoot, "app-dist/index.html"))
 	logger.Info(shtml)
 
@@ -77,7 +87,21 @@ func handleDynamicContent(cfg *Config, db *gorm.DB, logger *logrus.Logger) func(
 	cfgJson, _ := json.Marshal(cfg)
 	cfgJson = bytes.Join([][]byte{S2BA("liveRecordConfig = "), cfgJson, S2BA(";//")}, S2BA(" "))
 
+
+
 	return func(w http.ResponseWriter, r *http.Request) {
+
+		if cfg.Debug {
+			shtml, err = ioutil.ReadFile(path.Join(cfg.DocumentRoot, "app-dist/index.html"))
+			logger.Info(shtml)
+
+			if err != nil {
+				logger.WithError(err)
+			}
+			cfgJson, _ = json.Marshal(cfg)
+			cfgJson = bytes.Join([][]byte{S2BA("liveRecordConfig = "), cfgJson, S2BA(";//")}, S2BA(" "))
+		}
+
 		logger.Infof("%s %s", r.Method, r.RequestURI)
 		// serve it
 		html := bytes.Replace(
@@ -93,22 +117,20 @@ func handleDynamicContent(cfg *Config, db *gorm.DB, logger *logrus.Logger) func(
 			r.URL.Path = upath
 		}
 		if containsDotDot(r.URL.Path) {
-			w.WriteHeader(404)
-			w.Write(html)
+			respond(w, logger, 404, html)
 			return
 		}
 		elements := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 		logger.Infof("%v", elements)
 		if len(elements[0]) == 0 || elements[0] == "index.html" {
-			w.WriteHeader(200)
-			_, err = w.Write(html)
-			logger.WithError(err)
+			respond(w, logger, 200, html)
 			return
 		}
 		fname := path.Join(cfg.DocumentRoot, path.Clean(upath))
-		logger.Info(fname)
+		logger.Debug(fname)
 
 		f, err := os.Open(fname)
+		statusCode := 200
 		if err != nil {
 			switch len(elements) {
 			case 2:
@@ -123,7 +145,8 @@ func handleDynamicContent(cfg *Config, db *gorm.DB, logger *logrus.Logger) func(
 						maxDate(found.CreatedAt, found.UpdatedAt, found.CommentedAt).Format(time.RFC1123),
 					)
 				} else {
-					w.WriteHeader(404)
+					// w.WriteHeader(404)
+					statusCode = 404
 				}
 			case 1:
 
@@ -132,27 +155,24 @@ func handleDynamicContent(cfg *Config, db *gorm.DB, logger *logrus.Logger) func(
 					Where("slug = ?", elements[0]).
 					First(&found)
 				if found.ID > 0 {
-					w.WriteHeader(200)
 					html = inlineCategory(html, found)
 				} else {
-					w.WriteHeader(404)
+					statusCode = 404
 				}
 			default:
-				w.WriteHeader(200)
+				statusCode = 200
 			}
-			w.Write(html)
+			respond(w, logger, statusCode, html)
 			return
 		}
 		defer f.Close()
 		d, err := f.Stat()
 		if err != nil {
-			w.WriteHeader(404)
-			w.Write(html)
+			respond(w, logger, 404, html)
 			return
 		}
 		if d.IsDir() {
-			w.WriteHeader(403)
-			w.Write(html)
+			respond(w, logger, 403, html)
 			return
 		}
 		http.ServeFile(w, r, fname)

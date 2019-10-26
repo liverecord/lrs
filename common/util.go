@@ -7,6 +7,7 @@ import (
 	"github.com/microcosm-cc/bluemonday"
 )
 
+// Env returns an environment variable which is a string or default value if first one is not set
 func Env(key, def string) string {
 	val, set := os.LookupEnv(key)
 	if set {

@@ -11,10 +11,10 @@ import (
 func (Ctx *ConnCtx) CommentList(frame lrs.Frame) {
 	var comments []lrs.Comment
 	comments = make([]lrs.Comment, 0, 1)
-	var creq	 lrs.CommentListRequest
+	var creq lrs.CommentListRequest
 	err := frame.BindJSON(&creq)
 	if err != nil {
-		Ctx.Logger.WithError(err)
+		Ctx.Logger.WithError(err).WithField("commentsRequest", creq)
 		return
 	}
 	if creq.Page < 1 {
@@ -72,53 +72,56 @@ func (Ctx *ConnCtx) CommentList(frame lrs.Frame) {
 
 	// comments
 
-	if err == nil {
-		for rows.Next() {
-			var comm lrs.Comment
-			var commTopic CommentTopic
-			var commCat CommentCategory
-			var commUser CommentUser
-
-			if err := Ctx.Db.ScanRows(rows, &comm); err != nil {
-				Ctx.Logger.Errorf("should get no error, but got %v", err)
-			}
-
-			if err := Ctx.Db.ScanRows(rows, &commUser); err == nil {
-				comm.User.ID = comm.UserID
-				comm.User.Slug = commUser.UserSlug
-				comm.User.Name = commUser.UserName
-				comm.User.Online = commUser.UserOnline
-				comm.User.Picture = commUser.UserPicture
-				comm.User.Rank = commUser.UserRank
-				comm.User = comm.User.SafePluck()
-			}
-
-			if err := Ctx.Db.ScanRows(rows, &commTopic); err == nil {
-				comm.Topic.ID = comm.TopicID
-				comm.Topic.Slug = commTopic.TopicSlug
-				comm.Topic.Title = commTopic.TopicTitle
-				Ctx.Logger.Debugln(commTopic)
-			}
-
-			if err := Ctx.Db.ScanRows(rows, &commCat); err == nil {
-				comm.Topic.CategoryID = commCat.CategoryID
-				comm.Topic.Category.ID = commCat.CategoryID
-				comm.Topic.Category.Slug = commCat.CategorySlug
-				comm.Topic.Category.Name = commCat.CategoryName
-				Ctx.Logger.Debugln(commCat)
-			}
-
-			comments = append(comments, comm)
-		}
-		defer rows.Close()
-		pagination := lrs.Pagination{Page: 1, Total: total, Limit: Ctx.Cfg.CommentsPerPage}
-		resp := lrs.CommentListResponse{TopicID: creq.TopicID, Comments: comments, Pagination: pagination}
-		Ctx.Pool.Write(Ctx.Ws, lrs.NewFrame(lrs.CommentListFrame, resp, frame.RequestID))
-	} else {
+	if err != nil {
 		Ctx.Logger.WithError(err)
+
+		return
 	}
+
+	for rows.Next() {
+		var comm lrs.Comment
+		var commTopic CommentTopic
+		var commCat CommentCategory
+		var commUser CommentUser
+
+		if err := Ctx.Db.ScanRows(rows, &comm); err != nil {
+			Ctx.Logger.Errorf("should get no error, but got %v", err)
+		}
+
+		if err := Ctx.Db.ScanRows(rows, &commUser); err == nil {
+			comm.User.ID = comm.UserID
+			comm.User.Slug = commUser.UserSlug
+			comm.User.Name = commUser.UserName
+			comm.User.Online = commUser.UserOnline
+			comm.User.Picture = commUser.UserPicture
+			comm.User.Rank = commUser.UserRank
+			comm.User = comm.User.SafePluck()
+		}
+
+		if err := Ctx.Db.ScanRows(rows, &commTopic); err == nil {
+			comm.Topic.ID = comm.TopicID
+			comm.Topic.Slug = commTopic.TopicSlug
+			comm.Topic.Title = commTopic.TopicTitle
+			Ctx.Logger.Debugln(commTopic)
+		}
+
+		if err := Ctx.Db.ScanRows(rows, &commCat); err == nil {
+			comm.Topic.CategoryID = commCat.CategoryID
+			comm.Topic.Category.ID = commCat.CategoryID
+			comm.Topic.Category.Slug = commCat.CategorySlug
+			comm.Topic.Category.Name = commCat.CategoryName
+			Ctx.Logger.Debugln(commCat)
+		}
+
+		comments = append(comments, comm)
+	}
+	defer rows.Close()
+	pagination := lrs.Pagination{Page: 1, Total: total, Limit: Ctx.Cfg.CommentsPerPage}
+	resp := lrs.CommentListResponse{TopicID: creq.TopicID, Comments: comments, Pagination: pagination}
+	Ctx.Pool.Write(Ctx.Ws, lrs.NewFrame(lrs.CommentListFrame, resp, frame.RequestID))
 }
 
+//CommentTyping Sends events about typing
 func (Ctx *ConnCtx) CommentTyping(frame lrs.Frame) {
 	if !Ctx.IsAuthorized() {
 		return
@@ -157,7 +160,7 @@ func (Ctx *ConnCtx) CommentSave(frame lrs.Frame) {
 	err := frame.BindJSON(&comment)
 	Ctx.Logger.Debug("Decoded comment", comment)
 	if err != nil {
-		Ctx.Logger.WithError(err).Error("can't unmarshall comment")
+		Ctx.Logger.WithError(err).WithField("frame", frame).Error("can't unmarshall comment")
 		return
 	}
 	if comment.TopicID == 0 {

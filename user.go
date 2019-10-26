@@ -65,7 +65,7 @@ type Settings struct {
 	// 3. Daily email digests
 	// 4. Weekly email digests
 	UserID        uint
-	Notifications uint
+	Notifications uint `json:"notifications"`
 	Timezone      time.Location
 }
 
